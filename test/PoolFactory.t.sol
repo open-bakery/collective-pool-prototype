@@ -34,7 +34,7 @@ contract PoolFactoryTest is Test {
 
   function setUp() public {}
 
-  /* function testExample() public {
+  function testExample() public {
     assertTrue(true);
     address daiPool = IUniswapV3Factory(uniswapFactory).getPool(weth, dai, 3000);
     (
@@ -46,6 +46,8 @@ contract PoolFactoryTest is Test {
       uint160 secondsPerLiquidityOutsideX128,
       uint32 secondsOutside,
       bool initialized
-    ) = IUniswapV3Pool(daiPool).ticks(-73677);
-  } */
+    ) = IUniswapV3Pool(daiPool).ticks(-73602);
+    console.logInt(liquidityNet);
+    console.log(liquidityGross);
+  }
 }

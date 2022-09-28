@@ -6,4 +6,12 @@ deploy-testnet:; forge script script/Contract.s.sol:ContractScript --rpc-url $(T
 
 trace:; forge test -vv
 
-unitest:; forge test -vvv --match-test testUni* --fork-url $(FORK_RPC_URL)
+testOfln:; forge test -vvv --match-test testSimple*
+
+testMain:; forge test -vvv --match-test testMainnet* --fork-url $(FORK_RPC_URL)
+
+testArb:; forge test -vvv --mt testArbitrum*  --fork-url $(ARBITRUM_RPC_ALCHEMY)
+
+testPool:; forge test -vv --mc PoolTest --fork-url $(ARBITRUM_RPC_ALCHEMY)
+
+testGas:; forge test --vv --mc GasTest --gas-report --fork-url $(ARBITRUM_RPC_ALCHEMY)
