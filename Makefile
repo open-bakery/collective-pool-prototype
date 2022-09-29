@@ -6,7 +6,7 @@ deploy-testnet:; forge script script/Contract.s.sol:ContractScript --rpc-url $(T
 
 trace:; forge test -vv
 
-testOfln:; forge test -vvv --match-test testSimple*
+testLocal:; forge test -vvv --match-test testAnvil*
 
 testMain:; forge test -vvv --match-test testMainnet* --fork-url $(FORK_RPC_URL)
 

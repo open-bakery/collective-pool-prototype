@@ -18,9 +18,7 @@ contract PoolTest is Test {
 
   RangePool public automatedPool;
 
-  function setUp() public {
-    automatedPool = new RangePool(USDC, WETH, fee);
-  }
+  function setUp() public {}
 
   function testExample() public {}
 }
