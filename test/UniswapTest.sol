@@ -69,6 +69,20 @@ contract UniswapTest is Test {
     // ERC20(USDC).approve(address(rangePool), amountUSDC);
     // amountOut = rangePool.swap(USDC, amountUSDC, 50);
     // console.log('Amount out: ', amountOut);
+
+    uint256 amountETH = 50 ether;
+    ERC20(WETH).approve(address(router), amountETH);
+    getWeth(WETH, amountETH);
+    swap(WETH, USDC, fee, amountETH);
+    // uint256 amountOut = rangePool.swap(WETH, amountETH, 50);
+    // console.log('Amount out: ', amountOut);
+    uint256 amountUSDC = 1400_000000;
+    uint256 amountWETH = 3_000_000_000_000_000_000;
+
+    getWeth(WETH, amountWETH);
+    ERC20(WETH).approve(address(rangePool), amountWETH);
+    ERC20(USDC).approve(address(rangePool), amountUSDC);
+    rangePool.addLiquidity(amountWETH, amountUSDC);
   }
 
   function testMainnet() public {
@@ -87,7 +101,6 @@ contract UniswapTest is Test {
     //logRatios(rangePool, 1700_000000, 2 ether);
 
     uint256 amountETH = 50 ether;
-
     ERC20(WETH).approve(address(router), amountETH);
     getWeth(WETH, amountETH);
     swap(WETH, USDC, fee, amountETH);
@@ -95,12 +108,13 @@ contract UniswapTest is Test {
     // console.log('Amount out: ', amountOut);
 
     uint256 amountUSDC = 1400_000000;
+    uint256 amountWETH = 3 ether;
 
-    ERC20(WETH).approve(address(rangePool), 2 ether);
-    getWeth(WETH, 2 ether);
+    getWeth(WETH, amountWETH);
+    ERC20(WETH).approve(address(rangePool), amountWETH);
     ERC20(USDC).approve(address(rangePool), amountUSDC);
 
-    rangePool.addLiquidity(amountUSDC, 2 ether);
+    rangePool.addLiquidity(amountUSDC, amountWETH);
     // amountOut = rangePool.swap(USDC, amountUSDC, 50);
     // console.log('Amount out: ', amountOut);
   }
@@ -150,6 +164,10 @@ contract UniswapTest is Test {
     IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(tokenIn, tokenOut, fee));
     (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
+    uint160 limit = pool.token0() == tokenIn
+      ? sqrtPriceX96 - sqrtPriceX96 / 10
+      : sqrtPriceX96 + sqrtPriceX96 / 10;
+
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
@@ -158,7 +176,7 @@ contract UniswapTest is Test {
       deadline: block.timestamp,
       amountIn: amountIn,
       amountOutMinimum: 0,
-      sqrtPriceLimitX96: sqrtPriceX96 + sqrtPriceX96 / 10
+      sqrtPriceLimitX96: limit
     });
 
     amountOut = router.exactInputSingle(params);

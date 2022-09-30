@@ -273,8 +273,8 @@ contract RangePool is IERC721Receiver, Test {
     console.log('Balance of token 0: ', ERC20(token0).balanceOf(address(this)));
     console.log('Balance of token 1: ', ERC20(token1).balanceOf(address(this)));
 
-    //  assert(ERC20(token0).balanceOf(address(this)) >= amount0);
-    //  assert(ERC20(token1).balanceOf(address(this)) >= amount1);
+    assert(ERC20(token0).balanceOf(address(this)) >= amount0);
+    assert(ERC20(token1).balanceOf(address(this)) >= amount1);
   }
 
   function _calculateRatio(uint256 _amount0, uint256 _amount1)
