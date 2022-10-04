@@ -84,11 +84,21 @@ contract UniswapTest is Test {
     ERC20(USDC).approve(address(rangePool), type(uint256).max);
     rangePool.addLiquidity(amountWETH, amountUSDC, 100);
     uint256 balanceLP = rangePool.lpToken().balanceOf(address(this));
+    ERC20(rangePool.lpToken()).approve(address(rangePool), balanceLP);
+    (uint256 amount0Decreased, uint256 amount1Decreased) = rangePool.decreaseLiquidity(
+      uint128(balanceLP / 2),
+      100
+    );
+
     console.log('----------------------------------');
     console.log('testArbitrum() Function Call');
-    console.log('balanceLP: ', balanceLP);
-    ERC20(rangePool.lpToken()).approve(address(rangePool), balanceLP);
-    rangePool.decreaseLiquidity(uint128(balanceLP / 2), 100);
+    console.log('amount0Decreased: ', amount0Decreased);
+    console.log('amount1Decreased: ', amount1Decreased);
+    console.log('WETH.balanceOf(address(this))', ERC20(WETH).balanceOf(address(this)));
+    console.log('USDC.balanceOf(address(this))', ERC20(USDC).balanceOf(address(this)));
+    console.log('----------------------------------');
+
+    rangePool.addLiquidity(amount0Decreased, amount1Decreased, 100);
   }
 
   function testMainnet() public {

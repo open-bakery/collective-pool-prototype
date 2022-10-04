@@ -73,10 +73,6 @@ contract RangePool is IERC721Receiver, Test {
     uint256 id,
     bytes calldata data
   ) external override returns (bytes4) {
-    // @TODO Get position information
-
-    // Anyone can send an ERC721 to the contract so we need to lock it
-    // in order to record the correct tokenId.
     console.log('----------------------------------');
     console.log('onERC721Received() Function Call');
     console.log('----------------------------------');
@@ -96,22 +92,26 @@ contract RangePool is IERC721Receiver, Test {
     return _getPrice();
   }
 
-  function oraclePrice(uint32 secondsElapsed) public view returns (uint256) {
+  function oraclePrice(uint32 secondsElapsed) external view returns (uint256) {
     return _oracleUintPrice(secondsElapsed);
   }
 
-  function prices() public view returns (uint256 priceToken0, uint256 priceToken1) {
+  function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
     priceToken1 = _getPrice();
     priceToken0 = _priceToken0(priceToken1);
   }
 
   function oraclePrices(uint32 secondsElapsed)
-    public
+    external
     view
     returns (uint256 priceToken0, uint256 priceToken1)
   {
     priceToken1 = _oracleUintPrice(secondsElapsed);
     priceToken0 = _priceToken0(priceToken1);
+  }
+
+  function accumulatedFees() external view returns (uint256 amount0, uint256 amount1) {
+    (amount0, amount1) = NFPM.fees(tokenId);
   }
 
   function lowerLimit() external view returns (uint256) {
@@ -175,8 +175,8 @@ contract RangePool is IERC721Receiver, Test {
 
       uint256 refund0 = amount0Ratioed - addedAmount0;
       uint256 refund1 = amount1Ratioed - addedAmount1;
-      if (refund0 != 0) ERC20(token0).safeTransferFrom(address(this), _account, refund0);
-      if (refund1 != 0) ERC20(token1).safeTransferFrom(address(this), _account, refund1);
+      if (refund0 != 0) ERC20(token0).safeTransfer(_account, refund0);
+      if (refund1 != 0) ERC20(token1).safeTransfer(_account, refund1);
 
       console.log('----------------------------------');
       console.log('_addLiquidity() Function Call');
@@ -374,13 +374,25 @@ contract RangePool is IERC721Receiver, Test {
     (amount0Collected, amount1Collected) = NFPM.collect(params);
   }
 
+  function _collectFees(address _account)
+    internal
+    returns (uint256 amount0Collected, uint256 amount1Collected)
+  {
+    (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
+    (amount0Collected, amount1Collected) = _collect(
+      _account,
+      uint128(feeAmount0),
+      uint128(feeAmount1)
+    );
+  }
+
   function _burn() internal {}
 
   function _applySlippageTolerance(
     bool _positive,
     uint256 _amount,
     uint16 _slippage
-  ) internal returns (uint256 _amountAccepted) {
+  ) internal pure returns (uint256 _amountAccepted) {
     _amountAccepted = _positive
       ? (_amount * _slippage) / resolution + _amount
       : _amount - (_amount * _slippage) / resolution;
