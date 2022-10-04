@@ -115,6 +115,9 @@ contract UniswapTest is Test {
     ERC20(USDC).approve(address(rangePool), amountUSDC);
 
     rangePool.addLiquidity(amountUSDC, amountWETH);
+    uint256 balanceLP = rangePool.lpToken().balanceOf(address(this));
+    ERC20(rangePool.lpToken()).approve(address(rangePool), balanceLP);
+    rangePool.decreaseLiquidity(uint128(balanceLP / 2));
     // amountOut = rangePool.swap(USDC, amountUSDC, 50);
     // console.log('Amount out: ', amountOut);
   }
