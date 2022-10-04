@@ -5,6 +5,7 @@ pragma abicoder v2;
 import 'forge-std/Test.sol';
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
@@ -33,6 +34,7 @@ import './LP.sol';
 contract RangePool is IERC721Receiver, Test {
   using PositionValue for NonfungiblePositionManager;
   using TransferHelper for address;
+  using SafeERC20 for ERC20;
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -48,7 +50,8 @@ contract RangePool is IERC721Receiver, Test {
   int24 public upperTick;
   int24 public tickSpacing;
   uint256 public tokenId;
-  bool locked;
+
+  uint16 constant resolution = 10_000;
 
   constructor(
     address _tokenA_,
@@ -77,13 +80,7 @@ contract RangePool is IERC721Receiver, Test {
     console.log('----------------------------------');
     console.log('onERC721Received() Function Call');
     console.log('----------------------------------');
-    if (locked) {
-      tokenId = id;
-    }
 
-    locked = false;
-
-    // _createDeposit(operator, tokenId);
     return this.onERC721Received.selector;
   }
 
@@ -125,20 +122,27 @@ contract RangePool is IERC721Receiver, Test {
     return _getUpperLimit();
   }
 
-  function addLiquidity(uint256 amount0, uint256 amount1) external {
-    _addLiquidity(msg.sender, amount0, amount1);
+  function addLiquidity(
+    uint256 amount0,
+    uint256 amount1,
+    uint16 slippage
+  ) external {
+    _addLiquidity(msg.sender, amount0, amount1, slippage);
   }
 
-  function decreaseLiquidity(uint128 liquidity) external {
-    _decreaseLiquidity(msg.sender, liquidity, 50);
+  function decreaseLiquidity(uint128 liquidity, uint16 slippage)
+    external
+    returns (uint256 amount0Decreased, uint256 amount1Decreased)
+  {
+    (amount0Decreased, amount1Decreased) = _decreaseLiquidity(msg.sender, liquidity, slippage);
   }
 
   function calculateDepositRatio(uint256 amount0, uint256 amount1)
     external
     view
-    returns (uint256 _amount0, uint256 _amount1)
+    returns (uint256 amount0Ratioed, uint256 amount1Ratioed)
   {
-    (_amount0, _amount1) = _calculateRatio(amount0, amount1);
+    (amount0Ratioed, amount1Ratioed) = _calculateRatio(amount0, amount1);
   }
 
   function swap(
@@ -146,7 +150,7 @@ contract RangePool is IERC721Receiver, Test {
     uint256 amountIn,
     uint16 slippage
   ) external returns (uint256 amountOut) {
-    ERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+    ERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
     return _swap(tokenIn, amountIn, slippage);
   }
@@ -154,36 +158,34 @@ contract RangePool is IERC721Receiver, Test {
   function _addLiquidity(
     address _account,
     uint256 _amount0,
-    uint256 _amount1
+    uint256 _amount1,
+    uint16 _slippage
   ) internal {
-    (uint256 amount0, uint256 amount1) = _convertToRatio(_amount0, _amount1, 50);
+    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(_amount0, _amount1, 50);
 
     if (tokenId == 0) {
       (uint256 id, uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = _mint(
-        amount0,
-        amount1
+        _account,
+        amount0Ratioed,
+        amount1Ratioed,
+        _slippage
       );
 
-      lpToken = new LP(id);
+      tokenId = id;
+
+      uint256 refund0 = amount0Ratioed - addedAmount0;
+      uint256 refund1 = amount1Ratioed - addedAmount1;
+      if (refund0 != 0) ERC20(token0).safeTransferFrom(address(this), _account, refund0);
+      if (refund1 != 0) ERC20(token1).safeTransferFrom(address(this), _account, refund1);
 
       console.log('----------------------------------');
       console.log('_addLiquidity() Function Call');
       console.log('addedLiquidity: ', addedLiquidity);
-
-      lpToken.mint(_account, addedLiquidity);
-
-      uint256 refund0 = amount0 - addedAmount0;
-      uint256 refund1 = amount1 - addedAmount1;
-
-      if (refund0 != 0) ERC20(token0).transfer(_account, refund0);
-      if (refund0 != 1) ERC20(token1).transfer(_account, refund1);
-
-      tokenId = id;
       console.log('addedAmount0: ', addedAmount0);
       console.log('addedAmount1: ', addedAmount1);
       console.log('----------------------------------');
     } else {
-      // _increaseLiquidity(_amount0, _amount1);
+      _increaseLiquidity(_account, amount0Ratioed, amount1Ratioed, _slippage);
     }
   }
 
@@ -197,7 +199,6 @@ contract RangePool is IERC721Receiver, Test {
       'RangePool: Only tokens from the pool are supported for swap'
     );
 
-    uint16 resolution = 10_000;
     address tokenOut;
     _tokenIn == token0 ? tokenOut = token1 : tokenOut = token0;
     _tokenIn.safeApprove(address(router), _amountIn);
@@ -206,18 +207,11 @@ contract RangePool is IERC721Receiver, Test {
       ? _convert1ToToken0(_amountIn, true)
       : _convert0ToToken1(_amountIn, true);
 
-    console.log('----------------------------------');
-    console.log('_swap() Function Call');
-    console.log('expectedAmountOut: ', expectedAmountOut);
-
-    uint256 amountOutMinimum = expectedAmountOut - (expectedAmountOut * _slippage) / resolution;
-
-    console.log('amountOutMinimum: ', amountOutMinimum);
-    console.log('----------------------------------');
+    uint256 amountOutMinimum = _applySlippageTolerance(false, expectedAmountOut, _slippage);
 
     uint160 sqrtPriceLimitX96 = _tokenIn == token1
-      ? (_sqrtPriceX96() * _slippage) / resolution + _sqrtPriceX96()
-      : _sqrtPriceX96() - (_sqrtPriceX96() * _slippage) / resolution;
+      ? uint160(_applySlippageTolerance(true, uint256(_sqrtPriceX96()), _slippage))
+      : uint160(_applySlippageTolerance(false, uint256(_sqrtPriceX96()), _slippage));
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: _tokenIn,
@@ -231,21 +225,34 @@ contract RangePool is IERC721Receiver, Test {
     });
 
     _amountOut = router.exactInputSingle(params);
+
+    console.log('----------------------------------');
+    console.log('_swap() Function Call');
+    console.log('expectedAmountOut: ', expectedAmountOut);
+    console.log('amountOutMinimum: ', amountOutMinimum);
+    console.log('_amountOut: ', _amountOut);
+    console.log('----------------------------------');
   }
 
-  function _mint(uint256 _amount0, uint256 _amount1)
+  function _mint(
+    address _account,
+    uint256 _amount0,
+    uint256 _amount1,
+    uint16 _slippage
+  )
     internal
     returns (
-      uint256 tokenId_,
-      uint128 liquidity_,
-      uint256 amount0_,
-      uint256 amount1_
+      uint256 _generatedTokenId,
+      uint128 _liquidityAdded,
+      uint256 _amount0Received,
+      uint256 _amount1Received
     )
   {
-    locked = true;
+    token0.safeApprove(address(NFPM), type(uint256).max);
+    token1.safeApprove(address(NFPM), type(uint256).max);
 
-    token0.safeApprove(address(NFPM), _amount0);
-    token1.safeApprove(address(NFPM), _amount1);
+    uint256 amount0MinAccepted = _applySlippageTolerance(false, _amount0, _slippage);
+    uint256 amount1MinAccepted = _applySlippageTolerance(false, _amount1, _slippage);
 
     INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
       token0: token0,
@@ -255,34 +262,66 @@ contract RangePool is IERC721Receiver, Test {
       tickUpper: upperTick, //Tick needs to exist (right spacing)
       amount0Desired: _amount0,
       amount1Desired: _amount1,
-      amount0Min: 0, // slippage check
-      amount1Min: 0, // slippage check
+      amount0Min: amount0MinAccepted, // slippage check
+      amount1Min: amount1MinAccepted, // slippage check
       recipient: address(this), // receiver of ERC721
       deadline: block.timestamp
     });
 
-    (tokenId_, liquidity_, amount0_, amount1_) = NFPM.mint(params);
+    (_generatedTokenId, _liquidityAdded, _amount0Received, _amount1Received) = NFPM.mint(params);
+
+    if (address(lpToken) == address(0)) lpToken = new LP(_generatedTokenId);
+    lpToken.mint(_account, _liquidityAdded);
   }
 
-  function _increaseLiquidity(uint256 _amount0, uint256 _amount1) internal {
-    // INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager.IncreaseLoquidityParams({
-    //     tokenId:,
-    //     amount0Desired:,
-    //     amount1Desired:,
-    //     amount0Min:,
-    //     amount1Min:,
-    //     deadline:
-    // });
+  function _increaseLiquidity(
+    address _account,
+    uint256 _amount0,
+    uint256 _amount1,
+    uint16 _slippage
+  )
+    internal
+    returns (
+      uint128 _liquidityIncreased,
+      uint256 _amount0Increased,
+      uint256 _amount1Increased
+    )
+  {
+    uint256 amount0MinAccepted = _applySlippageTolerance(false, _amount0, _slippage);
+    uint256 amount1MinAccepted = _applySlippageTolerance(false, _amount1, _slippage);
+
+    INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
+      .IncreaseLiquidityParams({
+        tokenId: tokenId,
+        amount0Desired: _amount0,
+        amount1Desired: _amount1,
+        amount0Min: amount0MinAccepted,
+        amount1Min: amount1MinAccepted,
+        deadline: block.timestamp
+      });
+
+    (_liquidityIncreased, _amount0Increased, _amount1Increased) = NFPM.increaseLiquidity(params);
+
+    lpToken.mint(_account, uint256(_liquidityIncreased));
+
+    console.log('----------------------------------');
+    console.log('_increaseLiquidity() Function Call');
+    console.log('_amount0: ', _amount0);
+    console.log('_amount1: ', _amount1);
+    console.log('amount0MinAccepted: ', amount0MinAccepted);
+    console.log('amount1MinAccepted: ', amount1MinAccepted);
+    console.log('_amount0Increased: ', _amount0Increased);
+    console.log('_amount1Increased: ', _amount1Increased);
+    console.log('----------------------------------');
   }
 
   function _decreaseLiquidity(
     address _account,
     uint128 _liquidity,
     uint16 _slippage
-  ) internal returns (uint256 amount0Decreased, uint256 amount1Decreased) {
+  ) internal returns (uint256 _amount0Decreased, uint256 _amount1Decreased) {
     require(lpToken.balanceOf(_account) >= _liquidity, 'RangePool: Not enough liquidity');
 
-    uint16 resolution = 10_000;
     uint32 _seconds = 60;
 
     (uint256 _expectedAmount0, uint256 _expectedAmount1) = LiquidityAmounts.getAmountsForLiquidity(
@@ -292,16 +331,8 @@ contract RangePool is IERC721Receiver, Test {
       _liquidity
     );
 
-    uint256 amount0Min = _expectedAmount0 - (_expectedAmount0 * _slippage) / resolution;
-    uint256 amount1Min = _expectedAmount1 - (_expectedAmount1 * _slippage) / resolution;
-
-    console.log('----------------------------------');
-    console.log('_decreaseLiquidity() Function Call');
-    console.log('_expectedAmount0: ', _expectedAmount0);
-    console.log('_expectedAmount1: ', _expectedAmount1);
-    console.log('amount0Min: ', amount0Min);
-    console.log('amount1Min: ', amount1Min);
-    console.log('----------------------------------');
+    uint256 amount0Min = _applySlippageTolerance(false, _expectedAmount0, _slippage);
+    uint256 amount1Min = _applySlippageTolerance(false, _expectedAmount1, _slippage);
 
     INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager
       .DecreaseLiquidityParams({
@@ -313,38 +344,61 @@ contract RangePool is IERC721Receiver, Test {
       });
 
     lpToken.burn(_account, uint256(_liquidity));
-    (amount0Decreased, amount1Decreased) = NFPM.decreaseLiquidity(params);
+    (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
+    _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
+
+    console.log('----------------------------------');
+    console.log('_decreaseLiquidity() Function Call');
+    console.log('_expectedAmount0: ', _expectedAmount0);
+    console.log('_expectedAmount1: ', _expectedAmount1);
+    console.log('amount0Min: ', amount0Min);
+    console.log('amount1Min: ', amount1Min);
+    console.log('amount0Decreased: ', _amount0Decreased);
+    console.log('amount1Decreased: ', _amount1Decreased);
+    console.log('----------------------------------');
   }
 
-  function _collectFees() internal {
-    // INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
-    //     tokenId:,
-    //     recipient:,
-    //     amount0Max:,
-    //     amount1Max:
-    // });
+  function _collect(
+    address _account,
+    uint128 _amount0,
+    uint128 _amount1
+  ) internal returns (uint256 amount0Collected, uint256 amount1Collected) {
+    INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager
+      .CollectParams({
+        tokenId: tokenId,
+        recipient: _account,
+        amount0Max: _amount0,
+        amount1Max: _amount1
+      });
+
+    (amount0Collected, amount1Collected) = NFPM.collect(params);
   }
 
   function _burn() internal {}
+
+  function _applySlippageTolerance(
+    bool _positive,
+    uint256 _amount,
+    uint16 _slippage
+  ) internal returns (uint256 _amountAccepted) {
+    _amountAccepted = _positive
+      ? (_amount * _slippage) / resolution + _amount
+      : _amount - (_amount * _slippage) / resolution;
+  }
 
   function _convertToRatio(
     uint256 _amount0,
     uint256 _amount1,
     uint16 _slippage
   ) internal returns (uint256 amount0, uint256 amount1) {
-    ERC20(token0).transferFrom(msg.sender, address(this), _amount0);
-    ERC20(token1).transferFrom(msg.sender, address(this), _amount1);
+    ERC20(token0).safeTransferFrom(msg.sender, address(this), _amount0);
+    ERC20(token1).safeTransferFrom(msg.sender, address(this), _amount1);
 
     (uint256 targetAmount0, uint256 targetAmount1) = _calculateRatio(_amount0, _amount1);
 
     amount0 = _amount0;
     amount1 = _amount1;
     uint256 diff;
-
-    console.log('----------------------------------');
-    console.log('_convertRatio() Function Call');
-    console.log('targetAmount0: ', targetAmount0);
-    console.log('targetAmount1: ', targetAmount1);
 
     if (_amount0 > targetAmount0) {
       diff = _amount0 - targetAmount0;
@@ -358,6 +412,10 @@ contract RangePool is IERC721Receiver, Test {
       amount0 += _swap(token1, diff, _slippage);
     }
 
+    console.log('----------------------------------');
+    console.log('_convertRatio() Function Call');
+    console.log('targetAmount0: ', targetAmount0);
+    console.log('targetAmount1: ', targetAmount1);
     console.log('token0.balanceOf(address(this)): ', ERC20(token0).balanceOf(address(this)));
     console.log('amount0: ', amount0);
     console.log('token1.balanceOf(address(this)) ', ERC20(token1).balanceOf(address(this)));

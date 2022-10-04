@@ -71,7 +71,7 @@ contract UniswapTest is Test {
     // console.log('Amount out: ', amountOut);
 
     uint256 amountETH = 50 ether;
-    ERC20(WETH).approve(address(router), amountETH);
+    ERC20(WETH).approve(address(router), type(uint256).max);
     getWeth(WETH, amountETH);
     swap(WETH, USDC, fee, amountETH);
     // uint256 amountOut = rangePool.swap(WETH, amountETH, 50);
@@ -80,9 +80,15 @@ contract UniswapTest is Test {
     uint256 amountWETH = 3_000_000_000_000_000_000;
 
     getWeth(WETH, amountWETH);
-    ERC20(WETH).approve(address(rangePool), amountWETH);
-    ERC20(USDC).approve(address(rangePool), amountUSDC);
-    rangePool.addLiquidity(amountWETH, amountUSDC);
+    ERC20(WETH).approve(address(rangePool), type(uint256).max);
+    ERC20(USDC).approve(address(rangePool), type(uint256).max);
+    rangePool.addLiquidity(amountWETH, amountUSDC, 100);
+    uint256 balanceLP = rangePool.lpToken().balanceOf(address(this));
+    console.log('----------------------------------');
+    console.log('testArbitrum() Function Call');
+    console.log('balanceLP: ', balanceLP);
+    ERC20(rangePool.lpToken()).approve(address(rangePool), balanceLP);
+    rangePool.decreaseLiquidity(uint128(balanceLP / 2), 100);
   }
 
   function testMainnet() public {
@@ -101,7 +107,7 @@ contract UniswapTest is Test {
     //logRatios(rangePool, 1700_000000, 2 ether);
 
     uint256 amountETH = 50 ether;
-    ERC20(WETH).approve(address(router), amountETH);
+    ERC20(WETH).approve(address(router), type(uint256).max);
     getWeth(WETH, amountETH);
     swap(WETH, USDC, fee, amountETH);
     // uint256 amountOut = rangePool.swap(WETH, amountETH, 50);
@@ -111,14 +117,27 @@ contract UniswapTest is Test {
     uint256 amountWETH = 3 ether;
 
     getWeth(WETH, amountWETH);
-    ERC20(WETH).approve(address(rangePool), amountWETH);
-    ERC20(USDC).approve(address(rangePool), amountUSDC);
+    ERC20(WETH).approve(address(rangePool), type(uint256).max);
+    ERC20(USDC).approve(address(rangePool), type(uint256).max);
 
-    rangePool.addLiquidity(amountUSDC, amountWETH);
+    rangePool.addLiquidity(amountUSDC, amountWETH, 100);
     uint256 balanceLP = rangePool.lpToken().balanceOf(address(this));
-    ERC20(rangePool.lpToken()).approve(address(rangePool), balanceLP);
-    rangePool.decreaseLiquidity(uint128(balanceLP / 2));
-    // amountOut = rangePool.swap(USDC, amountUSDC, 50);
+    ERC20(rangePool.lpToken()).approve(address(rangePool), type(uint256).max);
+    (uint256 amount0Decreased, uint256 amount1Decreased) = rangePool.decreaseLiquidity(
+      uint128(balanceLP / 2),
+      100
+    );
+
+    console.log('----------------------------------');
+    console.log('testMain() Function Call');
+    console.log('amount0Decreased: ', amount0Decreased);
+    console.log('amount1Decreased: ', amount1Decreased);
+    console.log('WETH.balanceOf(address(this))', ERC20(WETH).balanceOf(address(this)));
+    console.log('USDC.balanceOf(address(this))', ERC20(USDC).balanceOf(address(this)));
+    console.log('----------------------------------');
+
+    rangePool.addLiquidity(amount0Decreased, amount1Decreased, 100);
+
     // console.log('Amount out: ', amountOut);
   }
 
