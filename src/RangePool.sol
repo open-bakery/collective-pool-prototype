@@ -88,6 +88,10 @@ contract RangePool is IERC721Receiver, Test {
     (amount0, amount1) = _getFees();
   }
 
+  function sqrtPriceX96() external view returns (uint160) {
+    return _sqrtPriceX96();
+  }
+
   function price() external view returns (uint256) {
     return _getPrice();
   }
@@ -530,6 +534,13 @@ contract RangePool is IERC721Receiver, Test {
     int24 tickL = _getValidatedTickNumber(lowerLimit, ERC20(token0).decimals(), tickSpacing);
     int24 tickU = _getValidatedTickNumber(upperLimit, ERC20(token0).decimals(), tickSpacing);
     (lowerTick, upperTick) = Utils.orderTicks(tickL, tickU);
+    console.log('--------------------------------');
+    console.log('_returnLimitInTicks Function Call');
+    console.log('tickL: ');
+    console.logInt(tickL);
+    console.log('tickU: ');
+    console.logInt(tickU);
+    console.log('--------------------------------');
   }
 
   function _getValidatedTickNumber(
@@ -559,6 +570,27 @@ contract RangePool is IERC721Receiver, Test {
         TickMath.getSqrtRatioAtTick(upperTick),
         ERC20(token0).decimals()
       );
+  }
+
+  function _calculatePrice() internal view returns (uint256) {
+    uint256 amount0 = FullMath.mulDiv(
+      IUniswapV3Pool(pool).liquidity(),
+      FixedPoint96.Q96,
+      _sqrtPriceX96()
+    );
+    uint256 amount1 = FullMath.mulDiv(
+      IUniswapV3Pool(pool).liquidity(),
+      _sqrtPriceX96(),
+      FixedPoint96.Q96
+    );
+
+    console.log('------------------------------');
+    console.log('_getPrice() Function Call');
+    console.log('amount0: ', amount0);
+    console.log('amount1: ', amount1);
+    console.log('------------------------------');
+
+    return (amount1 * 10**ERC20(token0).decimals()) / amount0;
   }
 
   function _getPrice() internal view returns (uint256) {
