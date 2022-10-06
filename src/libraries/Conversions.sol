@@ -14,9 +14,6 @@ library Conversions {
     pure
     returns (uint256)
   {
-    // uint256 a = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) * 10**decimalsToken0;
-    // uint256 b = (96 * 2);
-    // return a >> b;
     uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
     uint256 numerator2 = 10**decimalsToken0;
     return FullMath.mulDiv(numerator1, numerator2, 1 << 192);

@@ -1,26 +1,20 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.5.0 <0.8.14;
+pragma solidity >=0.7.0 <0.9.0;
 
+// import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
+contract PoolFactory {
+  constructor() {}
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
-import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import '@uniswap/v3-periphery/contracts/base/LiquidityManagement.sol';
-//Contract responsible for creating new pools.
+  // function muldiv(
+  //   uint256 a,
+  //   uint256 b,
+  //   uint256 c
+  // ) external pure returns (uint256) {
+  //   return FullMath.mulDiv(a, b, c);
+  // }
 
-contract PoolFactory is Ownable {
-
-  constructor() {
-
+  function add(uint256 a, uint256 b) external pure returns (uint256) {
+    return a + b;
   }
-
-  function addPool() external onlyOwner {
-    // Adds new pool to the protocol
-  }
-
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.6.0 <0.8.0;
+pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
 import 'forge-std/Test.sol';
@@ -24,6 +24,7 @@ import '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 
 import '../src/RangePool.sol';
+import '../src/PoolFactory.sol';
 
 contract UniswapTest is Test {
   using PositionValue for NonfungiblePositionManager;
@@ -59,12 +60,15 @@ contract UniswapTest is Test {
 
     IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(WETH, GMX, 3000));
 
-    RangePool rangePool = new RangePool(WETH, GMX, fee, 6690000000000000000, 991000000000000000000);
+    RangePool rangePool = new RangePool(WETH, GMX, fee, 2500000000000000000, 125000000000000000000);
 
     console.logInt(rangePool.lowerTick());
     console.logInt(rangePool.upperTick());
 
     logPrices(rangePool);
+    logPricesFromLiquidity(rangePool);
+
+    logRatios(rangePool, 23460000000000000000, 416100000000000000000);
 
     // uint256 amountETH = 50 ether;
     //
@@ -129,8 +133,6 @@ contract UniswapTest is Test {
     ERC20(WETH).approve(address(router), type(uint256).max);
     getWeth(WETH, amountETH);
     swap(WETH, USDC, fee, amountETH);
-    // uint256 amountOut = rangePool.swap(WETH, amountETH, 50);
-    // console.log('Amount out: ', amountOut);
 
     uint256 amountUSDC = 0;
     uint256 amountWETH = 149800000000000000;
@@ -156,11 +158,14 @@ contract UniswapTest is Test {
     console.log('----------------------------------');
 
     rangePool.addLiquidity(amount0Decreased, amount1Decreased, 100);
-
-    // console.log('Amount out: ', amountOut);
   }
 
-  function testAnvil() public view returns (uint256) {}
+  function testAnvil() public returns (uint256) {
+    PoolFactory pool = new PoolFactory();
+    uint256 a = type(uint256).max;
+    uint256 b = type(uint256).max;
+    pool.add(a, b);
+  }
 
   function getWeth(address weth, uint256 amount) public payable {
     require(address(this).balance >= amount, 'Not enough Ether in account');
@@ -182,6 +187,13 @@ contract UniswapTest is Test {
 
     console.log('Price Token 0: ', price0);
     console.log('Price Token 1: ', price1);
+  }
+
+  function logPricesFromLiquidity(RangePool rangePool) public view {
+    (uint256 price0, uint256 price1) = rangePool.pricesFromLiquidity();
+
+    console.log('Price From Liquidity Token 0: ', price0);
+    console.log('Price From Liquidity Token 1: ', price1);
   }
 
   function logOraclePrices(RangePool rangePool, uint32 _seconds) public view {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.5.0 <0.8.14;
+pragma solidity >=0.5.0 <0.8.0;
 pragma abicoder v2;
 
 import 'forge-std/Test.sol';
@@ -7,6 +7,7 @@ import 'forge-std/Test.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
+import '@openzeppelin/contracts/math/SafeMath.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
@@ -35,6 +36,7 @@ contract RangePool is IERC721Receiver, Test {
   using PositionValue for NonfungiblePositionManager;
   using TransferHelper for address;
   using SafeERC20 for ERC20;
+  using SafeMath for uint256;
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -54,17 +56,21 @@ contract RangePool is IERC721Receiver, Test {
   uint16 constant resolution = 10_000;
 
   constructor(
-    address _tokenA_,
-    address _tokenB_,
-    uint24 _fee_,
-    uint256 _lowerLimit_,
-    uint256 _upperLimit_
+    address _tokenA,
+    address _tokenB,
+    uint24 _fee,
+    uint256 _lowerLimit,
+    uint256 _upperLimit
   ) {
-    pool = Utils.getPoolAddress(_tokenA_, _tokenB_, _fee_, uniswapFactory);
-    (token0, token1) = Utils.orderTokens(_tokenA_, _tokenB_);
-    fee = _fee_;
+    require(_lowerLimit < _upperLimit, 'RangePool: _lowerLimit must be lower than _upperLimit');
+
+    pool = Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory);
+    (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
+    fee = _fee;
     tickSpacing = IUniswapV3Pool(pool).tickSpacing();
-    (lowerTick, upperTick) = _returnLimitInTicks(_lowerLimit_, _upperLimit_);
+
+    if (_lowerLimit == 0) _lowerLimit = 1;
+    (lowerTick, upperTick) = _returnLimitInTicks(_lowerLimit, _upperLimit);
   }
 
   function onERC721Received(
@@ -73,9 +79,9 @@ contract RangePool is IERC721Receiver, Test {
     uint256 id,
     bytes calldata data
   ) external override returns (bytes4) {
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('onERC721Received() Function Call');
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
     return this.onERC721Received.selector;
   }
@@ -96,12 +102,21 @@ contract RangePool is IERC721Receiver, Test {
     return _getPrice();
   }
 
+  function priceFromLiquidity() external view returns (uint256) {
+    return _getPriceFromLiquidity();
+  }
+
   function oraclePrice(uint32 secondsElapsed) external view returns (uint256) {
     return _oracleUintPrice(secondsElapsed);
   }
 
   function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
     priceToken1 = _getPrice();
+    priceToken0 = _priceToken0(priceToken1);
+  }
+
+  function pricesFromLiquidity() external view returns (uint256 priceToken0, uint256 priceToken1) {
+    priceToken1 = _getPriceFromLiquidity();
     priceToken0 = _priceToken0(priceToken1);
   }
 
@@ -159,40 +174,6 @@ contract RangePool is IERC721Receiver, Test {
     return _swap(tokenIn, amountIn, slippage);
   }
 
-  function _addLiquidity(
-    address _account,
-    uint256 _amount0,
-    uint256 _amount1,
-    uint16 _slippage
-  ) internal {
-    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(_amount0, _amount1, 50);
-
-    if (tokenId == 0) {
-      (uint256 id, uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = _mint(
-        _account,
-        amount0Ratioed,
-        amount1Ratioed,
-        _slippage
-      );
-
-      tokenId = id;
-
-      uint256 refund0 = amount0Ratioed - addedAmount0;
-      uint256 refund1 = amount1Ratioed - addedAmount1;
-      if (refund0 != 0) ERC20(token0).safeTransfer(_account, refund0);
-      if (refund1 != 0) ERC20(token1).safeTransfer(_account, refund1);
-
-      console.log('----------------------------------');
-      console.log('_addLiquidity() Function Call');
-      console.log('addedLiquidity: ', addedLiquidity);
-      console.log('addedAmount0: ', addedAmount0);
-      console.log('addedAmount1: ', addedAmount1);
-      console.log('----------------------------------');
-    } else {
-      _increaseLiquidity(_account, amount0Ratioed, amount1Ratioed, _slippage);
-    }
-  }
-
   function _swap(
     address _tokenIn,
     uint256 _amountIn,
@@ -230,12 +211,12 @@ contract RangePool is IERC721Receiver, Test {
 
     _amountOut = router.exactInputSingle(params);
 
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_swap() Function Call');
     console.log('expectedAmountOut: ', expectedAmountOut);
     console.log('amountOutMinimum: ', amountOutMinimum);
     console.log('_amountOut: ', _amountOut);
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
   function _mint(
@@ -278,6 +259,40 @@ contract RangePool is IERC721Receiver, Test {
     lpToken.mint(_account, _liquidityAdded);
   }
 
+  function _addLiquidity(
+    address _account,
+    uint256 _amount0,
+    uint256 _amount1,
+    uint16 _slippage
+  ) internal {
+    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(_amount0, _amount1, 50);
+
+    if (tokenId == 0) {
+      (uint256 id, uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = _mint(
+        _account,
+        amount0Ratioed,
+        amount1Ratioed,
+        _slippage
+      );
+
+      tokenId = id;
+
+      uint256 refund0 = amount0Ratioed.sub(addedAmount0);
+      uint256 refund1 = amount1Ratioed.sub(addedAmount1);
+      if (refund0 != 0) ERC20(token0).safeTransfer(_account, refund0);
+      if (refund1 != 0) ERC20(token1).safeTransfer(_account, refund1);
+
+      console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+      console.log('_addLiquidity() Function Call');
+      console.log('addedLiquidity: ', addedLiquidity);
+      console.log('addedAmount0: ', addedAmount0);
+      console.log('addedAmount1: ', addedAmount1);
+      console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    } else {
+      _increaseLiquidity(_account, amount0Ratioed, amount1Ratioed, _slippage);
+    }
+  }
+
   function _increaseLiquidity(
     address _account,
     uint256 _amount0,
@@ -308,7 +323,7 @@ contract RangePool is IERC721Receiver, Test {
 
     lpToken.mint(_account, uint256(_liquidityIncreased));
 
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_increaseLiquidity() Function Call');
     console.log('_amount0: ', _amount0);
     console.log('_amount1: ', _amount1);
@@ -316,7 +331,7 @@ contract RangePool is IERC721Receiver, Test {
     console.log('amount1MinAccepted: ', amount1MinAccepted);
     console.log('_amount0Increased: ', _amount0Increased);
     console.log('_amount1Increased: ', _amount1Increased);
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
   function _decreaseLiquidity(
@@ -351,7 +366,7 @@ contract RangePool is IERC721Receiver, Test {
     (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
     _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
 
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_decreaseLiquidity() Function Call');
     console.log('_expectedAmount0: ', _expectedAmount0);
     console.log('_expectedAmount1: ', _expectedAmount1);
@@ -359,7 +374,7 @@ contract RangePool is IERC721Receiver, Test {
     console.log('amount1Min: ', amount1Min);
     console.log('amount0Decreased: ', _amount0Decreased);
     console.log('amount1Decreased: ', _amount1Decreased);
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
   function _collect(
@@ -398,8 +413,8 @@ contract RangePool is IERC721Receiver, Test {
     uint16 _slippage
   ) internal pure returns (uint256 _amountAccepted) {
     _amountAccepted = _positive
-      ? (_amount * _slippage) / resolution + _amount
-      : _amount - (_amount * _slippage) / resolution;
+      ? (_amount.mul(_slippage).div(resolution)).add(_amount)
+      : _amount.sub(_amount.mul(_slippage).div(resolution));
   }
 
   function _convertToRatio(
@@ -417,18 +432,18 @@ contract RangePool is IERC721Receiver, Test {
     uint256 diff;
 
     if (_amount0 > targetAmount0) {
-      diff = _amount0 - targetAmount0;
-      amount0 -= diff;
-      amount1 += _swap(token0, diff, _slippage);
+      diff = _amount0.sub(targetAmount0);
+      amount0 = amount0.sub(diff);
+      amount1 = amount1.add(_swap(token0, diff, _slippage));
     }
 
     if (_amount1 > targetAmount1) {
-      diff = _amount1 - targetAmount1;
-      amount1 -= diff;
-      amount0 += _swap(token1, diff, _slippage);
+      diff = _amount1.sub(targetAmount1);
+      amount1 = amount1.sub(diff);
+      amount0 = amount0.add(_swap(token1, diff, _slippage));
     }
 
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_convertRatio() Function Call');
     console.log('targetAmount0: ', targetAmount0);
     console.log('targetAmount1: ', targetAmount1);
@@ -436,7 +451,7 @@ contract RangePool is IERC721Receiver, Test {
     console.log('amount0: ', amount0);
     console.log('token1.balanceOf(address(this)) ', ERC20(token1).balanceOf(address(this)));
     console.log('amount1: ', amount1);
-    console.log('----------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);
     assert(ERC20(token1).balanceOf(address(this)) >= amount1);
@@ -447,7 +462,7 @@ contract RangePool is IERC721Receiver, Test {
     view
     returns (uint256 amount0Ratioed, uint256 amount1Ratioed)
   {
-    uint256 sumConvertedToToken1 = _convert0ToToken1(_amount0, false) + _amount1;
+    uint256 sumConvertedToToken1 = _convert0ToToken1(_amount0, false).add(_amount1);
     (uint256 amount0ConvertedToToken1, uint256 amount1) = _applyRatio(
       sumConvertedToToken1,
       _getLowerLimit(),
@@ -464,8 +479,8 @@ contract RangePool is IERC721Receiver, Test {
   ) internal view returns (uint256 _ratio0InToken1, uint256 _ratio1) {
     uint16 precision = 10_000;
     (uint256 ratio0, uint256 ratio1) = _getRatioForLiquidity(_lowerLimit, _upperLimit, precision);
-    _ratio0InToken1 = (_amountSumInToken1 * ratio0) / precision;
-    _ratio1 = (_amountSumInToken1 * ratio1) / precision;
+    _ratio0InToken1 = _amountSumInToken1.mul(ratio0).div(precision);
+    _ratio1 = _amountSumInToken1.mul(ratio1).div(precision);
   }
 
   function _getRatioForLiquidity(
@@ -475,15 +490,15 @@ contract RangePool is IERC721Receiver, Test {
   ) internal view returns (uint256 _ratioToken0, uint256 _ratioToken1) {
     (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(_lowerLimit, _upperLimit);
     uint256 amount0ConvertedToToken1 = _convert0ToToken1(amount0, false);
-    uint256 sum = amount0ConvertedToToken1 + amount1;
-    _ratioToken0 = (amount0ConvertedToToken1 * _precision) / sum;
-    _ratioToken1 = (amount1 * _precision) / sum;
+    uint256 sum = amount0ConvertedToToken1.add(amount1);
+    _ratioToken0 = amount0ConvertedToToken1.mul(_precision).div(sum);
+    _ratioToken1 = amount1.mul(_precision).div(sum);
   }
 
   function _priceToken0(uint256 _priceToken1) internal view returns (uint256) {
     uint8 decimalsToken0 = ERC20(token0).decimals();
     uint8 decimalsToken1 = ERC20(token1).decimals();
-    return 10**(decimalsToken0 + decimalsToken1) / _priceToken1;
+    return (10**(SafeMath.add(decimalsToken0, decimalsToken1))).div(_priceToken1);
   }
 
   function _convert0ToToken1(uint256 amount0, bool useOracle)
@@ -493,7 +508,7 @@ contract RangePool is IERC721Receiver, Test {
   {
     uint256 price = useOracle ? _oracleUintPrice(60) : _getPrice();
 
-    amount0ConvertedToToken1 = (amount0 * price) / 10**ERC20(token0).decimals();
+    amount0ConvertedToToken1 = amount0.mul(price).div(10**ERC20(token0).decimals());
   }
 
   function _convert1ToToken0(uint256 amount1, bool useOracle)
@@ -503,7 +518,7 @@ contract RangePool is IERC721Receiver, Test {
   {
     uint256 price = useOracle ? _oracleUintPrice(60) : _getPrice();
 
-    amount1ConvertedToToken0 = (amount1 * 10**ERC20(token0).decimals()) / price;
+    amount1ConvertedToToken0 = amount1.mul(10**ERC20(token0).decimals()).div(price);
   }
 
   function _getAmountsForLiquidity(uint256 _lowerLimit, uint256 _upperLimit)
@@ -534,13 +549,13 @@ contract RangePool is IERC721Receiver, Test {
     int24 tickL = _getValidatedTickNumber(lowerLimit, ERC20(token0).decimals(), tickSpacing);
     int24 tickU = _getValidatedTickNumber(upperLimit, ERC20(token0).decimals(), tickSpacing);
     (lowerTick, upperTick) = Utils.orderTicks(tickL, tickU);
-    console.log('--------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_returnLimitInTicks Function Call');
     console.log('tickL: ');
     console.logInt(tickL);
     console.log('tickU: ');
     console.logInt(tickU);
-    console.log('--------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
   function _getValidatedTickNumber(
@@ -553,6 +568,7 @@ contract RangePool is IERC721Receiver, Test {
   }
 
   function _validateTick(int24 _tick, int24 _tickSpacing) internal pure returns (int24) {
+    if (_tickSpacing == 0) _tickSpacing = 1;
     return (_tick / _tickSpacing) * _tickSpacing;
   }
 
@@ -572,7 +588,7 @@ contract RangePool is IERC721Receiver, Test {
       );
   }
 
-  function _calculatePrice() internal view returns (uint256) {
+  function _getPriceFromLiquidity() internal view returns (uint256) {
     uint256 amount0 = FullMath.mulDiv(
       IUniswapV3Pool(pool).liquidity(),
       FixedPoint96.Q96,
@@ -584,13 +600,13 @@ contract RangePool is IERC721Receiver, Test {
       FixedPoint96.Q96
     );
 
-    console.log('------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_getPrice() Function Call');
     console.log('amount0: ', amount0);
     console.log('amount1: ', amount1);
-    console.log('------------------------------');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
-    return (amount1 * 10**ERC20(token0).decimals()) / amount0;
+    return (amount1.mul(10**ERC20(token0).decimals())).div(amount0);
   }
 
   function _getPrice() internal view returns (uint256) {
