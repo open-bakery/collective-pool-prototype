@@ -102,8 +102,8 @@ contract RangePool is IERC721Receiver, Test {
     return _getPrice();
   }
 
-  function priceFromLiquidity() external view returns (uint256) {
-    return _getPriceFromLiquidity();
+  function priceFromLiquidity() public view returns (uint256) {
+    return _getPriceFromLiquidity(_liquidity(), _sqrtPriceX96());
   }
 
   function oraclePrice(uint32 secondsElapsed) external view returns (uint256) {
@@ -111,12 +111,12 @@ contract RangePool is IERC721Receiver, Test {
   }
 
   function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
-    priceToken1 = _getPrice();
+    priceToken1 = _getPriceFromLiquidity(_liquidity(), _sqrtPriceX96());
     priceToken0 = _priceToken0(priceToken1);
   }
 
   function pricesFromLiquidity() external view returns (uint256 priceToken0, uint256 priceToken1) {
-    priceToken1 = _getPriceFromLiquidity();
+    priceToken1 = priceFromLiquidity();
     priceToken0 = _priceToken0(priceToken1);
   }
 
@@ -139,6 +139,36 @@ contract RangePool is IERC721Receiver, Test {
 
   function upperLimit() external view returns (uint256) {
     return _getUpperLimit();
+  }
+
+  function tokenAmountsAtLowerLimit(address account)
+    external
+    view
+    returns (uint256 amount0, uint256 amount1)
+  {
+    (uint256 lowerAmount0, ) = _getTokenAmountsAtLowerLimit(
+      uint128(LP(lpToken).balanceOf(account))
+    );
+    (uint256 higherAmount0, ) = _getTokenAmountsAtUpperLimit(
+      uint128(LP(lpToken).balanceOf(account))
+    );
+    amount0 = lowerAmount0.sub(higherAmount0);
+    amount1 = 0;
+  }
+
+  function tokenAmountsAtUpperLimit(address account)
+    external
+    view
+    returns (uint256 amount0, uint256 amount1)
+  {
+    (, uint256 lowerAmount1) = _getTokenAmountsAtLowerLimit(
+      uint128(LP(lpToken).balanceOf(account))
+    );
+    (, uint256 higherAmount1) = _getTokenAmountsAtUpperLimit(
+      uint128(LP(lpToken).balanceOf(account))
+    );
+    amount0 = 0;
+    amount1 = higherAmount1.sub(lowerAmount1);
   }
 
   function addLiquidity(
@@ -537,7 +567,7 @@ contract RangePool is IERC721Receiver, Test {
       _sqrtPriceX96(),
       lowerLimitSqrtPricex96,
       upperLimitSqrtPricex96,
-      IUniswapV3Pool(pool).liquidity()
+      _liquidity()
     );
   }
 
@@ -588,25 +618,48 @@ contract RangePool is IERC721Receiver, Test {
       );
   }
 
-  function _getPriceFromLiquidity() internal view returns (uint256) {
-    uint256 amount0 = FullMath.mulDiv(
-      IUniswapV3Pool(pool).liquidity(),
-      FixedPoint96.Q96,
-      _sqrtPriceX96()
-    );
-    uint256 amount1 = FullMath.mulDiv(
-      IUniswapV3Pool(pool).liquidity(),
-      _sqrtPriceX96(),
-      FixedPoint96.Q96
-    );
+  function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price) {}
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
-    console.log('_getPrice() Function Call');
-    console.log('amount0: ', amount0);
-    console.log('amount1: ', amount1);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+  function _getAveragePriceAtUpperLimit() internal view returns (uint256 _amount1) {}
 
+  function _getTokenAmountsAtLowerLimit(uint128 _liquidity)
+    internal
+    view
+    returns (uint256 _amount0, uint256 _amount1)
+  {
+    (_amount0, _amount1) = _getAmountsFromLiquidity(
+      _liquidity,
+      TickMath.getSqrtRatioAtTick(lowerTick)
+    );
+  }
+
+  function _getTokenAmountsAtUpperLimit(uint128 _liquidity)
+    internal
+    view
+    returns (uint256 _amount0, uint256 _amount1)
+  {
+    (_amount0, _amount1) = _getAmountsFromLiquidity(
+      _liquidity,
+      TickMath.getSqrtRatioAtTick(upperTick)
+    );
+  }
+
+  function _getPriceFromLiquidity(uint128 liquidity, uint160 sqrtPriceX96)
+    internal
+    view
+    returns (uint256)
+  {
+    (uint256 amount0, uint256 amount1) = _getAmountsFromLiquidity(liquidity, sqrtPriceX96);
     return (amount1.mul(10**ERC20(token0).decimals())).div(amount0);
+  }
+
+  function _getAmountsFromLiquidity(uint128 liquidity, uint160 sqrtPriceX96)
+    internal
+    pure
+    returns (uint256 _amount0, uint256 _amount1)
+  {
+    _amount0 = FullMath.mulDiv(liquidity, FixedPoint96.Q96, sqrtPriceX96);
+    _amount1 = FullMath.mulDiv(liquidity, sqrtPriceX96, FixedPoint96.Q96);
   }
 
   function _getPrice() internal view returns (uint256) {
@@ -624,6 +677,10 @@ contract RangePool is IERC721Receiver, Test {
 
   function _sqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
     (sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
+  }
+
+  function _liquidity() internal view returns (uint128) {
+    return IUniswapV3Pool(pool).liquidity();
   }
 
   // Get principal from a specific position.

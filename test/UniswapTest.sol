@@ -31,7 +31,6 @@ contract UniswapTest is Test {
   using TransferHelper for address;
 
   IUniswapV3Factory factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
-
   NonfungiblePositionManager NFPM =
     NonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
   ISwapRouter router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -45,23 +44,11 @@ contract UniswapTest is Test {
 
   mapping(uint256 => Deposit) deposits;
 
-  function setUp() public {}
+  function setUp() public {
+    // CHECK THIS OUT! https://etherscan.io/address/0x00D54F129293b1580C779c8F04b2d8cE370cA69d#code - decodeSqrtPriceX96
+  }
 
   function testArbitrum() public {
-    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1; // Token0
-    address USDC = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8; // Token1
-    address GMX = 0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a;
-    uint24 fee = 3000;
-    //address pool = 0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443;
-
-    //RangePool rangePool = new RangePool(WETH, USDC, fee, 1000_000000, 2000_000000);
-
-    // CHECK THIS OUT! https://etherscan.io/address/0x00D54F129293b1580C779c8F04b2d8cE370cA69d#code - decodeSqrtPriceX96
-
-    IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(WETH, GMX, 3000));
-
-    RangePool rangePool = new RangePool(WETH, GMX, fee, 2500000000000000000, 125000000000000000000);
-
     console.logInt(rangePool.lowerTick());
     console.logInt(rangePool.upperTick());
 
@@ -120,7 +107,7 @@ contract UniswapTest is Test {
     uint24 fee = 500;
     // address pool = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
 
-    RangePool rangePool = new RangePool(WETH, USDC, fee, 1000000000000000, 500000000000000);
+    RangePool rangePool = new RangePool(WETH, USDC, fee, 499000000000000, 999700000000000);
 
     // logPrices(rangePool);
     // logOraclePrices(rangePool, 300);
@@ -134,30 +121,32 @@ contract UniswapTest is Test {
     getWeth(WETH, amountETH);
     swap(WETH, USDC, fee, amountETH);
 
-    uint256 amountUSDC = 0;
-    uint256 amountWETH = 149800000000000000;
+    uint256 amountUSDC = 12780_000000;
+    uint256 amountWETH = 11470000000000000000;
 
     getWeth(WETH, amountWETH);
     ERC20(WETH).approve(address(rangePool), type(uint256).max);
     ERC20(USDC).approve(address(rangePool), type(uint256).max);
 
     rangePool.addLiquidity(amountUSDC, amountWETH, 1_00);
-    uint256 balanceLP = rangePool.lpToken().balanceOf(address(this));
-    ERC20(rangePool.lpToken()).approve(address(rangePool), type(uint256).max);
-    (uint256 amount0Decreased, uint256 amount1Decreased) = rangePool.decreaseLiquidity(
-      uint128(balanceLP / 2),
-      100
-    );
+    logTokenAmountsAtLimits(rangePool);
 
-    console.log('----------------------------------');
-    console.log('testMain() Function Call');
-    console.log('amount0Decreased: ', amount0Decreased);
-    console.log('amount1Decreased: ', amount1Decreased);
-    console.log('WETH.balanceOf(address(this))', ERC20(WETH).balanceOf(address(this)));
-    console.log('USDC.balanceOf(address(this))', ERC20(USDC).balanceOf(address(this)));
-    console.log('----------------------------------');
+    // uint256 balanceLP = rangePool.lpToken().balanceOf(address(this));
+    // ERC20(rangePool.lpToken()).approve(address(rangePool), type(uint256).max);
+    // (uint256 amount0Decreased, uint256 amount1Decreased) = rangePool.decreaseLiquidity(
+    //   uint128(balanceLP / 2),
+    //   100
+    // );
+    //
+    // console.log('----------------------------------');
+    // console.log('testMain() Function Call');
+    // console.log('amount0Decreased: ', amount0Decreased);
+    // console.log('amount1Decreased: ', amount1Decreased);
+    // console.log('WETH.balanceOf(address(this))', ERC20(WETH).balanceOf(address(this)));
+    // console.log('USDC.balanceOf(address(this))', ERC20(USDC).balanceOf(address(this)));
+    // console.log('----------------------------------');
 
-    rangePool.addLiquidity(amount0Decreased, amount1Decreased, 100);
+    // rangePool.addLiquidity(amount0Decreased, amount1Decreased, 100);
   }
 
   function testAnvil() public returns (uint256) {
@@ -167,9 +156,54 @@ contract UniswapTest is Test {
     pool.add(a, b);
   }
 
+  function testArbiUSD_ETH() public {
+    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1; // Token0
+    address USDC = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8; // Token1
+    uint24 fee = 500;
+    //address pool = 0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443;
+    RangePool rangePool = new RangePool(WETH, USDC, fee, 1000_000000, 2000_000000);
+    ERC20(WETH).approve(address(router), type(uint256).max);
+    ERC20(WETH).approve(address(rangePool), type(uint256).max);
+    ERC20(USDC).approve(address(rangePool), type(uint256).max);
+
+    uint256 amountETH = 50 ether;
+
+    getWeth(WETH, amountETH);
+    rangePool.swap(WETH, amountETH / 2, 50);
+    rangePool.swap(USDC, amountUSDC, 50);
+
+    uint256 amountUSDC = 1400_000000;
+    uint256 amountWETH = 3_000_000_000_000_000_000;
+  }
+
+  function testArbiETH_GMX() public {
+    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1; // Token0
+    address GMX = 0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a; // Token1
+    uint24 fee = 3000;
+
+    RangePool rangePool = new RangePool(WETH, GMX, fee, 2500000000000000000, 125000000000000000000);
+  }
+
   function getWeth(address weth, uint256 amount) public payable {
     require(address(this).balance >= amount, 'Not enough Ether in account');
     IWETH9(weth).deposit{ value: amount }();
+  }
+
+  function logTokenAmountsAtLimits(RangePool rangePool) public view {
+    (uint256 lowerAmount0, uint256 lowerAmount1) = rangePool.tokenAmountsAtLowerLimit(
+      address(this)
+    );
+    (uint256 upperAmount0, uint256 upperAmount1) = rangePool.tokenAmountsAtUpperLimit(
+      address(this)
+    );
+
+    console.log('---------------------------------------');
+    console.log('logTokenAmountsAtLimits() Function Call');
+    console.log('lowerAmount0: ', lowerAmount0);
+    console.log('lowerAmount1: ', lowerAmount1);
+    console.log('upperAmount0: ', upperAmount0);
+    console.log('upperAmount1: ', upperAmount1);
+    console.log('---------------------------------------');
   }
 
   function logRatios(
