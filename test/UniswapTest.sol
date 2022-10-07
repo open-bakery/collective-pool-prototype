@@ -27,7 +27,7 @@ import '../src/RangePool.sol';
 import '../src/PoolFactory.sol';
 import '../src/libraries/Conversions.sol';
 
-contract UniswapTest is Test {
+contract UniswapTest is Test, IERC721Receiver {
   using PositionValue for NonfungiblePositionManager;
   using TransferHelper for address;
 
@@ -59,8 +59,8 @@ contract UniswapTest is Test {
   }
 
   function testMainnet() public {
-    // scenario01(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
-    fullLogs(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
+    scenario01(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
+    // fullLogs(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
   }
 
   function testAnvil() public returns (uint256) {}
@@ -121,6 +121,10 @@ contract UniswapTest is Test {
     );
 
     rangePool.addLiquidity(amount0Decreased, amount1Decreased, slippage);
+
+    rangePool.claimNFT();
+    assertTrue(NFPM.ownerOf(rangePool.tokenId()) == address(this));
+    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == 0);
   }
 
   function fullLogs(
@@ -246,5 +250,23 @@ contract UniswapTest is Test {
     });
 
     amountOut = router.exactInputSingle(params);
+  }
+
+  function onERC721Received(
+    address operator,
+    address from,
+    uint256 id,
+    bytes calldata data
+  ) external override returns (bytes4) {
+    operator;
+    from;
+    id;
+    data;
+
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('onERC721Received() Function Call');
+    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+
+    return this.onERC721Received.selector;
   }
 }

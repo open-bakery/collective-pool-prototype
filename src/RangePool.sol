@@ -9,6 +9,7 @@ import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
@@ -30,11 +31,12 @@ import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 import './libraries/Conversions.sol';
 import './libraries/Utils.sol';
 import './libraries/Math.sol';
+
 import './LP.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
-contract RangePool is IERC721Receiver, Test {
+contract RangePool is IERC721Receiver, Test, Ownable {
   using PositionValue for NonfungiblePositionManager;
   using TransferHelper for address;
   using SafeERC20 for ERC20;
@@ -57,7 +59,6 @@ contract RangePool is IERC721Receiver, Test {
   uint256 public tokenId;
 
   uint32 public oracleSeconds = 60;
-
   uint16 constant resolution = 10_000;
 
   constructor(
@@ -85,6 +86,11 @@ contract RangePool is IERC721Receiver, Test {
     uint256 id,
     bytes calldata data
   ) external override returns (bytes4) {
+    operator;
+    from;
+    id;
+    data;
+
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('onERC721Received() Function Call');
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
@@ -185,21 +191,6 @@ contract RangePool is IERC721Receiver, Test {
     price1 = _getAveragePriceAtUpperLimit();
   }
 
-  function addLiquidity(
-    uint256 amount0,
-    uint256 amount1,
-    uint16 slippage
-  ) external {
-    _addLiquidity(msg.sender, amount0, amount1, slippage);
-  }
-
-  function decreaseLiquidity(uint128 liquidity, uint16 slippage)
-    external
-    returns (uint256 amount0Decreased, uint256 amount1Decreased)
-  {
-    (amount0Decreased, amount1Decreased) = _decreaseLiquidity(msg.sender, liquidity, slippage);
-  }
-
   function calculateDepositRatio(uint256 amount0, uint256 amount1)
     external
     view
@@ -208,14 +199,32 @@ contract RangePool is IERC721Receiver, Test {
     (amount0Ratioed, amount1Ratioed) = _calculateRatio(amount0, amount1);
   }
 
-  function swap(
-    address tokenIn,
-    uint256 amountIn,
+  function addLiquidity(
+    uint256 amount0,
+    uint256 amount1,
     uint16 slippage
-  ) external returns (uint256 amountOut) {
-    ERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+  ) external onlyOwner {
+    ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
+    ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
+    _addLiquidity(msg.sender, amount0, amount1, slippage);
+  }
 
-    return _swap(tokenIn, amountIn, slippage);
+  function decreaseLiquidity(uint128 liquidity, uint16 slippage)
+    external
+    onlyOwner
+    returns (uint256 amount0Decreased, uint256 amount1Decreased)
+  {
+    (amount0Decreased, amount1Decreased) = _decreaseLiquidity(msg.sender, liquidity, slippage);
+  }
+
+  function claimNFT() external onlyOwner {
+    LP(lpToken).burn(msg.sender, LP(lpToken).balanceOf(msg.sender));
+    NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
+  }
+
+  function compound() external onlyOwner {
+    (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
+    _addLiquidity(msg.sender, amountCollected0, amountCollected1, 1_00);
   }
 
   function _swap(
@@ -304,7 +313,7 @@ contract RangePool is IERC721Receiver, Test {
   }
 
   function _addLiquidity(
-    address _account,
+    address _recipient,
     uint256 _amount0,
     uint256 _amount1,
     uint16 _slippage
@@ -317,7 +326,7 @@ contract RangePool is IERC721Receiver, Test {
 
     if (tokenId == 0) {
       (uint256 id, uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = _mint(
-        _account,
+        _recipient,
         amount0Ratioed,
         amount1Ratioed,
         _slippage
@@ -327,8 +336,8 @@ contract RangePool is IERC721Receiver, Test {
 
       uint256 refund0 = amount0Ratioed.sub(addedAmount0);
       uint256 refund1 = amount1Ratioed.sub(addedAmount1);
-      if (refund0 != 0) ERC20(token0).safeTransfer(_account, refund0);
-      if (refund1 != 0) ERC20(token1).safeTransfer(_account, refund1);
+      if (refund0 != 0) ERC20(token0).safeTransfer(_recipient, refund0);
+      if (refund1 != 0) ERC20(token1).safeTransfer(_recipient, refund1);
 
       console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
       console.log('_addLiquidity() Function Call');
@@ -337,12 +346,12 @@ contract RangePool is IERC721Receiver, Test {
       console.log('addedAmount1: ', addedAmount1);
       console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     } else {
-      _increaseLiquidity(_account, amount0Ratioed, amount1Ratioed, _slippage);
+      _increaseLiquidity(_recipient, amount0Ratioed, amount1Ratioed, _slippage);
     }
   }
 
   function _increaseLiquidity(
-    address _account,
+    address _recipient,
     uint256 _amount0,
     uint256 _amount1,
     uint16 _slippage
@@ -369,7 +378,7 @@ contract RangePool is IERC721Receiver, Test {
 
     (_liquidityIncreased, _amount0Increased, _amount1Increased) = NFPM.increaseLiquidity(params);
 
-    lpToken.mint(_account, uint256(_liquidityIncreased));
+    lpToken.mint(_recipient, uint256(_liquidityIncreased));
 
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     console.log('_increaseLiquidity() Function Call');
@@ -470,9 +479,6 @@ contract RangePool is IERC721Receiver, Test {
     uint256 _amount1,
     uint16 _slippage
   ) internal returns (uint256 amount0, uint256 amount1) {
-    ERC20(token0).safeTransferFrom(msg.sender, address(this), _amount0);
-    ERC20(token1).safeTransferFrom(msg.sender, address(this), _amount1);
-
     (uint256 targetAmount0, uint256 targetAmount1) = _calculateRatio(_amount0, _amount1);
 
     amount0 = _amount0;
