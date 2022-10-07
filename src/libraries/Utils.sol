@@ -30,4 +30,13 @@ library Utils {
   {
     (tickLower, tickUpper) = tick1 < tick0 ? (tick1, tick0) : (tick0, tick1);
   }
+
+  function sqrt(uint256 x) internal pure returns (uint256 y) {
+    uint256 z = (x + 1) / 2;
+    y = x;
+    while (z < y) {
+      y = z;
+      z = (x / z + z) / 2;
+    }
+  }
 }

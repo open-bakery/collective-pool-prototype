@@ -3,6 +3,7 @@ pragma solidity >=0.5.0 <0.8.14;
 
 import '@openzeppelin/contracts/math/SafeMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
+import './Math.sol';
 
 library Conversions {
   using SafeMath for uint256;
@@ -26,15 +27,6 @@ library Conversions {
     returns (uint160)
   {
     uint256 ratioX192 = FullMath.mulDiv(priceToken1, 1 << 192, 10**decimalsToken0);
-    return uint160(_sqrt(ratioX192));
-  }
-
-  function _sqrt(uint256 x) internal pure returns (uint256 y) {
-    uint256 z = (x + 1) / 2;
-    y = x;
-    while (z < y) {
-      y = z;
-      z = (x / z + z) / 2;
-    }
+    return uint160(Math.sqrt(ratioX192));
   }
 }

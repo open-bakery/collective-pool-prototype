@@ -8,6 +8,7 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
+import '@openzeppelin/contracts/utils/Address.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
@@ -28,6 +29,7 @@ import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 
 import './libraries/Conversions.sol';
 import './libraries/Utils.sol';
+import './libraries/Math.sol';
 import './LP.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
@@ -37,6 +39,7 @@ contract RangePool is IERC721Receiver, Test {
   using TransferHelper for address;
   using SafeERC20 for ERC20;
   using SafeMath for uint256;
+  using Address for address;
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -53,6 +56,8 @@ contract RangePool is IERC721Receiver, Test {
   int24 public tickSpacing;
   uint256 public tokenId;
 
+  uint32 public oracleSeconds = 60;
+
   uint16 constant resolution = 10_000;
 
   constructor(
@@ -63,10 +68,11 @@ contract RangePool is IERC721Receiver, Test {
     uint256 _upperLimit
   ) {
     require(_lowerLimit < _upperLimit, 'RangePool: _lowerLimit must be lower than _upperLimit');
-
     pool = Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory);
+
     (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
     fee = _fee;
+
     tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
     if (_lowerLimit == 0) _lowerLimit = 1;
@@ -169,6 +175,14 @@ contract RangePool is IERC721Receiver, Test {
     );
     amount0 = 0;
     amount1 = higherAmount1.sub(lowerAmount1);
+  }
+
+  function averagePriceAtLowerLimit() external view returns (uint256 price0) {
+    price0 = _getAveragePriceAtLowerLimit();
+  }
+
+  function averagePriceAtUpperLimit() external view returns (uint256 price1) {
+    price1 = _getAveragePriceAtUpperLimit();
   }
 
   function addLiquidity(
@@ -295,7 +309,11 @@ contract RangePool is IERC721Receiver, Test {
     uint256 _amount1,
     uint16 _slippage
   ) internal {
-    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(_amount0, _amount1, 50);
+    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(
+      _amount0,
+      _amount1,
+      _slippage
+    );
 
     if (tokenId == 0) {
       (uint256 id, uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = _mint(
@@ -371,7 +389,7 @@ contract RangePool is IERC721Receiver, Test {
   ) internal returns (uint256 _amount0Decreased, uint256 _amount1Decreased) {
     require(lpToken.balanceOf(_account) >= _liquidity, 'RangePool: Not enough liquidity');
 
-    uint32 _seconds = 60;
+    uint32 _seconds = oracleSeconds;
 
     (uint256 _expectedAmount0, uint256 _expectedAmount1) = LiquidityAmounts.getAmountsForLiquidity(
       _oracleSqrtPricex96(_seconds),
@@ -536,7 +554,7 @@ contract RangePool is IERC721Receiver, Test {
     view
     returns (uint256 amount0ConvertedToToken1)
   {
-    uint256 price = useOracle ? _oracleUintPrice(60) : _getPrice();
+    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _getPrice();
 
     amount0ConvertedToToken1 = amount0.mul(price).div(10**ERC20(token0).decimals());
   }
@@ -546,7 +564,7 @@ contract RangePool is IERC721Receiver, Test {
     view
     returns (uint256 amount1ConvertedToToken0)
   {
-    uint256 price = useOracle ? _oracleUintPrice(60) : _getPrice();
+    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _getPrice();
 
     amount1ConvertedToToken0 = amount1.mul(10**ERC20(token0).decimals()).div(price);
   }
@@ -618,9 +636,13 @@ contract RangePool is IERC721Receiver, Test {
       );
   }
 
-  function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price) {}
+  function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price0) {
+    _price0 = _priceToken0(_getAveragePriceAtUpperLimit());
+  }
 
-  function _getAveragePriceAtUpperLimit() internal view returns (uint256 _amount1) {}
+  function _getAveragePriceAtUpperLimit() internal view returns (uint256 _price1) {
+    _price1 = Math.sqrt(_getLowerLimit().mul(_getUpperLimit()));
+  }
 
   function _getTokenAmountsAtLowerLimit(uint128 _liquidity)
     internal
