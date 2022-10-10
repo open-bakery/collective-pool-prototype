@@ -203,10 +203,23 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint256 amount0,
     uint256 amount1,
     uint16 slippage
-  ) external onlyOwner {
+  )
+    external
+    onlyOwner
+    returns (
+      uint128 liquidityAdded,
+      uint256 amount0Received,
+      uint256 amount1Received
+    )
+  {
     ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
-    _addLiquidity(msg.sender, amount0, amount1, slippage);
+    (liquidityAdded, amount0Received, amount1Received) = _addLiquidity(
+      msg.sender,
+      amount0,
+      amount1,
+      slippage
+    );
   }
 
   function decreaseLiquidity(uint128 liquidity, uint16 slippage)
@@ -222,9 +235,22 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
   }
 
-  function compound() external onlyOwner {
+  function compound(uint16 splippage)
+    external
+    onlyOwner
+    returns (
+      uint128 addedLiquidity,
+      uint256 amountCompounded0,
+      uint256 amountCompounded1
+    )
+  {
     (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
-    _addLiquidity(msg.sender, amountCollected0, amountCollected1, 1_00);
+    (addedLiquidity, amountCompounded0, amountCompounded1) = _addLiquidity(
+      msg.sender,
+      amountCollected0,
+      amountCollected1,
+      splippage
+    );
   }
 
   function _swap(
@@ -317,7 +343,14 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint256 _amount0,
     uint256 _amount1,
     uint16 _slippage
-  ) internal {
+  )
+    internal
+    returns (
+      uint128 _liquidityAdded,
+      uint256 _amount0Added,
+      uint256 _amount1Added
+    )
+  {
     (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(
       _amount0,
       _amount1,
@@ -339,6 +372,10 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       if (refund0 != 0) ERC20(token0).safeTransfer(_recipient, refund0);
       if (refund1 != 0) ERC20(token1).safeTransfer(_recipient, refund1);
 
+      _liquidityAdded = addedLiquidity;
+      _amount0Added = addedAmount0;
+      _amount1Added = addedAmount1;
+
       console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
       console.log('_addLiquidity() Function Call');
       console.log('addedLiquidity: ', addedLiquidity);
@@ -346,7 +383,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       console.log('addedAmount1: ', addedAmount1);
       console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     } else {
-      _increaseLiquidity(_recipient, amount0Ratioed, amount1Ratioed, _slippage);
+      (_liquidityAdded, _amount0Added, _amount1Added) = _increaseLiquidity(
+        _recipient,
+        amount0Ratioed,
+        amount1Ratioed,
+        _slippage
+      );
     }
   }
 

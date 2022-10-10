@@ -12,6 +12,7 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
+import '@uniswap/v3-core/contracts/libraries/Position.sol';
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
@@ -30,6 +31,7 @@ import '../src/libraries/Conversions.sol';
 contract UniswapTest is Test, IERC721Receiver {
   using PositionValue for NonfungiblePositionManager;
   using TransferHelper for address;
+  using stdStorage for StdStorage;
 
   IUniswapV3Factory factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
   NonfungiblePositionManager NFPM =
@@ -59,7 +61,19 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   function testMainnet() public {
-    scenario01(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
+    RangePool rangePool = scenario01(MAIN_WETH, 1000 ether, MAIN_USDC, 20_000_000_000000, 500);
+    performSwaps(MAIN_WETH, 1_000_000 ether, MAIN_USDC, 500);
+
+    (, uint256 compounded0, uint256 compounded1) = rangePool.compound(3_00);
+    console.log('compounded0: ', compounded0);
+    console.log('compounded1: ', compounded1);
+
+    (uint256 feeA, uint256 feeB) = NFPM.fees(rangePool.tokenId());
+    console.log('feeA: ', feeA);
+    console.log('feeA: ', feeB);
+
+    console.log('LP Balance RangePool: ', ERC20(rangePool.lpToken()).balanceOf(address(rangePool)));
+
     // fullLogs(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
   }
 
@@ -101,7 +115,7 @@ contract UniswapTest is Test, IERC721Receiver {
     address tokenB,
     uint256 amountB,
     uint24 fee
-  ) public {
+  ) public returns (RangePool rp) {
     (RangePool rangePool, uint256 amount0, uint256 amount1) = initialize(
       tokenA,
       amountA,
@@ -110,7 +124,7 @@ contract UniswapTest is Test, IERC721Receiver {
       fee
     );
 
-    uint16 slippage = 5_00;
+    uint16 slippage = 20_00;
     rangePool.addLiquidity(amount0, amount1, slippage);
 
     ERC20(rangePool.lpToken()).approve(address(rangePool), type(uint256).max);
@@ -122,9 +136,39 @@ contract UniswapTest is Test, IERC721Receiver {
 
     rangePool.addLiquidity(amount0Decreased, amount1Decreased, slippage);
 
-    rangePool.claimNFT();
-    assertTrue(NFPM.ownerOf(rangePool.tokenId()) == address(this));
-    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == 0);
+    // rangePool.claimNFT();
+    // assertTrue(NFPM.ownerOf(rangePool.tokenId()) == address(this));
+    // assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == 0);
+
+    rp = rangePool;
+  }
+
+  function performSwaps(
+    address tokenA,
+    uint256 amount0,
+    address tokenB,
+    uint24 fee
+  ) internal {
+    ERC20(tokenA).approve(address(router), type(uint256).max);
+    ERC20(tokenB).approve(address(router), type(uint256).max);
+    deal(address(tokenA), address(this), amount0);
+    uint256 receivedA;
+    uint256 receivedB;
+
+    receivedB = swap(tokenA, tokenB, fee, amount0);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
+    receivedB = swap(tokenA, tokenB, fee, receivedA);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
+    receivedB = swap(tokenA, tokenB, fee, receivedA);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
+    receivedB = swap(tokenA, tokenB, fee, receivedA);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
+    receivedB = swap(tokenA, tokenB, fee, receivedA);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
+    receivedB = swap(tokenA, tokenB, fee, receivedA);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
+    receivedB = swap(tokenA, tokenB, fee, receivedA);
+    receivedA = swap(tokenB, tokenA, fee, receivedB);
   }
 
   function fullLogs(
