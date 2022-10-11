@@ -56,23 +56,12 @@ contract UniswapTest is Test, IERC721Receiver {
   function setUp() public {}
 
   function testArbitrum() public {
-    // scenario01(ARB_WETH, 5 ether, ARB_USDC, 20000_000000, 500);
+    // testCases(0, ARB_WETH, 5 ether, ARB_USDC, 20000_000000, 500);
     fullLogs(ARB_WETH, 5 ether, ARB_USDC, 2000_000000, 500);
   }
 
   function testMainnet() public {
-    RangePool rangePool = scenario01(MAIN_WETH, 1000 ether, MAIN_USDC, 20_000_000_000000, 500);
-    performSwaps(MAIN_WETH, 1_000_000 ether, MAIN_USDC, 500);
-
-    (, uint256 compounded0, uint256 compounded1) = rangePool.compound(3_00);
-    console.log('compounded0: ', compounded0);
-    console.log('compounded1: ', compounded1);
-
-    (uint256 feeA, uint256 feeB) = NFPM.fees(rangePool.tokenId());
-    console.log('feeA: ', feeA);
-    console.log('feeA: ', feeB);
-
-    console.log('LP Balance RangePool: ', ERC20(rangePool.lpToken()).balanceOf(address(rangePool)));
+    testCases(1, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
 
     // fullLogs(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
   }
@@ -104,18 +93,16 @@ contract UniswapTest is Test, IERC721Receiver {
 
     ERC20(tokenA).approve(address(rangePool), type(uint256).max);
     ERC20(tokenB).approve(address(rangePool), type(uint256).max);
-
-    deal(address(token0), address(this), amount0);
-    deal(address(token1), address(this), amount1);
   }
 
-  function scenario01(
+  function testCases(
+    uint8 test,
     address tokenA,
     uint256 amountA,
     address tokenB,
     uint256 amountB,
     uint24 fee
-  ) public returns (RangePool rp) {
+  ) public {
     (RangePool rangePool, uint256 amount0, uint256 amount1) = initialize(
       tokenA,
       amountA,
@@ -124,9 +111,48 @@ contract UniswapTest is Test, IERC721Receiver {
       fee
     );
 
+    if (test == 0) testLiquidityProvisionAndNFTClaim(rangePool, amount0, amount1);
+    if (test == 1) testAutoCompound(rangePool, amount0 * 100, amount1 * 100);
+  }
+
+  function testAutoCompound(
+    RangePool rangePool,
+    uint256 amount0,
+    uint256 amount1
+  ) public {
     uint16 slippage = 20_00;
+    uint8 multiplier = 10;
+
+    deal(rangePool.token0(), address(this), amount0);
+    deal(rangePool.token1(), address(this), amount1);
+
     rangePool.addLiquidity(amount0, amount1, slippage);
 
+    deal(rangePool.token0(), address(this), amount0 * multiplier);
+
+    performSwaps(rangePool.token0(), amount0 * multiplier, rangePool.token1(), 500);
+    (, uint256 compounded0, uint256 compounded1) = rangePool.compound(3_00);
+    console.log('compounded0: ', compounded0);
+    console.log('compounded1: ', compounded1);
+
+    (uint256 feeA, uint256 feeB) = NFPM.fees(rangePool.tokenId());
+    console.log('feeA: ', feeA);
+    console.log('feeA: ', feeB);
+
+    console.log('LP Balance RangePool: ', ERC20(rangePool.lpToken()).balanceOf(address(rangePool)));
+  }
+
+  function testLiquidityProvisionAndNFTClaim(
+    RangePool rangePool,
+    uint256 amount0,
+    uint256 amount1
+  ) public {
+    uint16 slippage = 5_00;
+
+    deal(rangePool.token0(), address(this), amount0);
+    deal(rangePool.token1(), address(this), amount1);
+
+    rangePool.addLiquidity(amount0, amount1, slippage);
     ERC20(rangePool.lpToken()).approve(address(rangePool), type(uint256).max);
 
     (uint256 amount0Decreased, uint256 amount1Decreased) = rangePool.decreaseLiquidity(
@@ -136,11 +162,9 @@ contract UniswapTest is Test, IERC721Receiver {
 
     rangePool.addLiquidity(amount0Decreased, amount1Decreased, slippage);
 
-    // rangePool.claimNFT();
-    // assertTrue(NFPM.ownerOf(rangePool.tokenId()) == address(this));
-    // assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == 0);
-
-    rp = rangePool;
+    rangePool.claimNFT();
+    assertTrue(NFPM.ownerOf(rangePool.tokenId()) == address(this));
+    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == 0);
   }
 
   function performSwaps(

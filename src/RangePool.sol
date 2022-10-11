@@ -235,7 +235,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
   }
 
-  function compound(uint16 splippage)
+  function compound(uint16 slippage)
     external
     onlyOwner
     returns (
@@ -244,13 +244,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       uint256 amountCompounded1
     )
   {
-    (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
-    (addedLiquidity, amountCompounded0, amountCompounded1) = _addLiquidity(
-      msg.sender,
-      amountCollected0,
-      amountCollected1,
-      splippage
-    );
+    (addedLiquidity, amountCompounded0, amountCompounded1) = _compound(msg.sender, slippage);
   }
 
   function _swap(
@@ -477,14 +471,14 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   }
 
   function _collect(
-    address _account,
+    address _recipient,
     uint128 _amount0,
     uint128 _amount1
   ) internal returns (uint256 amount0Collected, uint256 amount1Collected) {
     INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager
       .CollectParams({
         tokenId: tokenId,
-        recipient: _account,
+        recipient: _recipient,
         amount0Max: _amount0,
         amount1Max: _amount1
       });
@@ -492,17 +486,36 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     (amount0Collected, amount1Collected) = NFPM.collect(params);
   }
 
-  function _collectFees(address _account)
+  function _collectFees(address _recipient)
     internal
     returns (uint256 amount0Collected, uint256 amount1Collected)
   {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
     (amount0Collected, amount1Collected) = _collect(
-      _account,
+      _recipient,
       uint128(feeAmount0),
       uint128(feeAmount1)
     );
   }
+
+  function _compound(address _recipient, uint16 _slippage)
+    internal
+    returns (
+      uint128 _addedLiquidity,
+      uint256 _amountCompounded0,
+      uint256 _amountCompounded1
+    )
+  {
+    (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
+    (_addedLiquidity, _amountCompounded0, _amountCompounded1) = _addLiquidity(
+      _recipient,
+      amountCollected0,
+      amountCollected1,
+      _slippage
+    );
+  }
+
+  function _dca(address token) internal returns (uint256 amountAcquired) {}
 
   function _burn() internal {}
 
