@@ -2,16 +2,20 @@
 pragma solidity >=0.5.0 <0.8.14;
 
 import '@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol';
+import './Conversions.sol';
 
 library Utils {
   function getPoolAddress(
-    address _tokenA,
-    address _tokenB,
-    uint24 _fee,
-    address _uniswapFactory
+    address tokenA,
+    address tokenB,
+    uint24 fee,
+    address uniswapFactory
   ) internal pure returns (address) {
-    return
-      PoolAddress.computeAddress(_uniswapFactory, PoolAddress.getPoolKey(_tokenA, _tokenB, _fee));
+    return PoolAddress.computeAddress(uniswapFactory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
+  }
+
+  function getPrice(uint160 sqrtPriceX96, uint8 decimalsToken0) internal pure returns (uint256) {
+    return Conversions.sqrtPriceX96ToUint(sqrtPriceX96, decimalsToken0);
   }
 
   function orderTokens(address tokenA, address tokenB)

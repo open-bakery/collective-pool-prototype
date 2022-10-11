@@ -6,10 +6,8 @@ import 'forge-std/Test.sol';
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
-import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
@@ -17,13 +15,9 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 
-import '@uniswap/v3-periphery/contracts/NonfungiblePositionManager.sol';
-
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 
-import '@uniswap/v3-periphery/contracts/libraries/PositionValue.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
@@ -43,6 +37,8 @@ contract SDCA is Test {
   uint32 public oracleSeconds = 60;
   uint16 constant resolution = 10_000;
 
+  constructor() {}
+
   function swap(
     address tokenIn,
     address tokenOut,
@@ -52,6 +48,7 @@ contract SDCA is Test {
   ) external returns (uint256 amountOut) {
     ERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
     amountOut = _swap(tokenIn, tokenOut, fee, amountIn, slippage);
+    ERC20(tokenOut).safeTransfer(msg.sender, amountOut);
   }
 
   function _swap(
@@ -88,12 +85,12 @@ contract SDCA is Test {
 
     _amountOut = router.exactInputSingle(params);
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('----------------------------------');
     console.log('_swap() Function Call');
     console.log('expectedAmountOut: ', expectedAmountOut);
     console.log('amountOutMinimum: ', amountOutMinimum);
     console.log('_amountOut: ', _amountOut);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('----------------------------------');
   }
 
   function _sqrtPriceX96(IUniswapV3Pool pool) internal view returns (uint160 sqrtPriceX96) {
