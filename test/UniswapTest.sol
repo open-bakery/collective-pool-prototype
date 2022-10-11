@@ -65,12 +65,25 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   function testMainnet() public {
-    // testCases(1, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
-    testSwapFromDCA(MAIN_APE, MAIN_WETH, 3000, 64_000 ether, 5_00);
+    // testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
+    // testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
+    testPoolConstruct(MAIN_USDC, MAIN_WETH, 500, 1000000000000000, 500000000000000);
+    // testSwapFromDCA(MAIN_APE, MAIN_WETH, 3000, 64_000 ether, 5_00);
     // fullLogs(MAIN_WETH, 3 ether, MAIN_USDC, 2400_000000, 500);
   }
 
   function testAnvil() public returns (uint256) {}
+
+  function testPoolConstruct(
+    address tokenA,
+    address tokenB,
+    uint24 fee,
+    uint256 lowerLimitInTokenB,
+    uint256 upperLimitInTokenB
+  ) public returns (RangePool rangePool) {
+    rangePool = new RangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
+    logLimits(rangePool);
+  }
 
   function initialize(
     address tokenA,
@@ -248,12 +261,8 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   function logTokenAmountsAtLimits(RangePool rangePool) public view {
-    (uint256 lowerAmount0, uint256 lowerAmount1) = rangePool.tokenAmountsAtLowerLimit(
-      address(this)
-    );
-    (uint256 upperAmount0, uint256 upperAmount1) = rangePool.tokenAmountsAtUpperLimit(
-      address(this)
-    );
+    (uint256 lowerAmount0, uint256 lowerAmount1) = rangePool.tokenAmountsAtLowerLimit();
+    (uint256 upperAmount0, uint256 upperAmount1) = rangePool.tokenAmountsAtUpperLimit();
 
     console.log('---------------------------------------');
     console.log('logTokenAmountsAtLimits() Function Call');
@@ -349,9 +358,9 @@ contract UniswapTest is Test, IERC721Receiver {
     id;
     data;
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
     console.log('onERC721Received() Function Call');
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
 
     return this.onERC721Received.selector;
   }

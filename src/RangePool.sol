@@ -31,7 +31,6 @@ import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 import './libraries/Conversions.sol';
 import './libraries/Utils.sol';
 import './libraries/Math.sol';
-
 import './LP.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
@@ -49,14 +48,20 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     NonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
   LP public lpToken;
+
   address public token0;
   address public token1;
   address public pool;
+
   uint24 public fee;
+
   int24 public lowerTick;
   int24 public upperTick;
   int24 public tickSpacing;
+
   uint256 public tokenId;
+  uint256 public totalClaimedFees0;
+  uint256 public totalClaimedFees1;
 
   uint32 public oracleSeconds = 60;
   uint16 constant resolution = 10_000;
@@ -65,19 +70,36 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     address _tokenA,
     address _tokenB,
     uint24 _fee,
-    uint256 _lowerLimit,
-    uint256 _upperLimit
+    uint256 _lowerLimitInTokenB,
+    uint256 _upperLimitInTokenB
   ) {
-    require(_lowerLimit < _upperLimit, 'RangePool: _lowerLimit must be lower than _upperLimit');
+    require(_lowerLimitInTokenB != _upperLimitInTokenB, 'RangePool: Limits must be within a range');
+
+    (_lowerLimitInTokenB, _upperLimitInTokenB) = (_lowerLimitInTokenB < _upperLimitInTokenB)
+      ? (_lowerLimitInTokenB, _upperLimitInTokenB)
+      : (_upperLimitInTokenB, _lowerLimitInTokenB);
+
     pool = Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory);
 
     (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
+
+    if (_tokenA != token0) {
+      _lowerLimitInTokenB = _priceToken0(_lowerLimitInTokenB);
+      _upperLimitInTokenB = _priceToken0(_upperLimitInTokenB);
+    }
+
     fee = _fee;
 
     tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
-    if (_lowerLimit == 0) _lowerLimit = 1;
-    (lowerTick, upperTick) = _returnLimitInTicks(_lowerLimit, _upperLimit);
+    if (_lowerLimitInTokenB == 0) _lowerLimitInTokenB = 1;
+
+    (lowerTick, upperTick) = Utils.convertLimitsToTicks(
+      _lowerLimitInTokenB,
+      _upperLimitInTokenB,
+      tickSpacing,
+      ERC20(token0).decimals()
+    );
   }
 
   function onERC721Received(
@@ -85,25 +107,25 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     address from,
     uint256 id,
     bytes calldata data
-  ) external override returns (bytes4) {
+  ) external view override returns (bytes4) {
     operator;
     from;
     id;
     data;
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
     console.log('onERC721Received() Function Call');
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
 
     return this.onERC721Received.selector;
   }
 
   function principal() external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = _getPrincipal();
+    (amount0, amount1) = NFPM.principal(tokenId, _sqrtPriceX96());
   }
 
   function unclaimedFees() external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = _getFees();
+    (amount0, amount1) = NFPM.fees(tokenId);
   }
 
   function sqrtPriceX96() external view returns (uint160) {
@@ -111,11 +133,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   }
 
   function price() external view returns (uint256) {
-    return _getPrice();
+    return _uintPrice();
   }
 
   function priceFromLiquidity() public view returns (uint256) {
-    return _getPriceFromLiquidity(_liquidity(), _sqrtPriceX96());
+    return Utils.getPriceFromLiquidity(_liquidity(), _sqrtPriceX96(), ERC20(token0).decimals());
   }
 
   function oraclePrice(uint32 secondsElapsed) external view returns (uint256) {
@@ -123,7 +145,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   }
 
   function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
-    priceToken1 = _getPriceFromLiquidity(_liquidity(), _sqrtPriceX96());
+    priceToken1 = Utils.getPriceFromLiquidity(
+      _liquidity(),
+      _sqrtPriceX96(),
+      ERC20(token0).decimals()
+    );
     priceToken0 = _priceToken0(priceToken1);
   }
 
@@ -141,43 +167,35 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     priceToken0 = _priceToken0(priceToken1);
   }
 
-  function accumulatedFees() external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = NFPM.fees(tokenId);
-  }
-
   function lowerLimit() external view returns (uint256) {
-    return _getLowerLimit();
+    return _lowerLimit();
   }
 
   function upperLimit() external view returns (uint256) {
-    return _getUpperLimit();
+    return _upperLimit();
   }
 
-  function tokenAmountsAtLowerLimit(address account)
-    external
-    view
-    returns (uint256 amount0, uint256 amount1)
-  {
-    (uint256 lowerAmount0, ) = _getTokenAmountsAtLowerLimit(
-      uint128(LP(lpToken).balanceOf(account))
+  function tokenAmountsAtLowerLimit() external view returns (uint256 amount0, uint256 amount1) {
+    (uint256 lowerAmount0, ) = Utils.getTokenAmountsAtLowerTick(
+      uint128(LP(lpToken).balanceOf(owner())),
+      lowerTick
     );
-    (uint256 higherAmount0, ) = _getTokenAmountsAtUpperLimit(
-      uint128(LP(lpToken).balanceOf(account))
+    (uint256 higherAmount0, ) = Utils.getTokenAmountsAtUpperTick(
+      uint128(LP(lpToken).balanceOf(owner())),
+      upperTick
     );
     amount0 = lowerAmount0.sub(higherAmount0);
     amount1 = 0;
   }
 
-  function tokenAmountsAtUpperLimit(address account)
-    external
-    view
-    returns (uint256 amount0, uint256 amount1)
-  {
-    (, uint256 lowerAmount1) = _getTokenAmountsAtLowerLimit(
-      uint128(LP(lpToken).balanceOf(account))
+  function tokenAmountsAtUpperLimit() external view returns (uint256 amount0, uint256 amount1) {
+    (, uint256 lowerAmount1) = Utils.getTokenAmountsAtLowerTick(
+      uint128(LP(lpToken).balanceOf(owner())),
+      lowerTick
     );
-    (, uint256 higherAmount1) = _getTokenAmountsAtUpperLimit(
-      uint128(LP(lpToken).balanceOf(account))
+    (, uint256 higherAmount1) = Utils.getTokenAmountsAtUpperTick(
+      uint128(LP(lpToken).balanceOf(owner())),
+      upperTick
     );
     amount0 = 0;
     amount1 = higherAmount1.sub(lowerAmount1);
@@ -196,7 +214,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     view
     returns (uint256 amount0Ratioed, uint256 amount1Ratioed)
   {
-    (amount0Ratioed, amount1Ratioed) = _calculateRatio(amount0, amount1);
+    (amount0Ratioed, amount1Ratioed) = _calculateRatio(
+      amount0,
+      amount1,
+      _lowerLimit(),
+      _upperLimit()
+    );
   }
 
   function addLiquidity(
@@ -228,6 +251,16 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     returns (uint256 amount0Decreased, uint256 amount1Decreased)
   {
     (amount0Decreased, amount1Decreased) = _decreaseLiquidity(msg.sender, liquidity, slippage);
+  }
+
+  // @TODO
+  function updateRange(uint256 lowerLimit, uint256 upperLimit)
+    external
+    returns (uint256 amount0, uint256 amount1)
+  {
+    // Retreive
+    // change Range of pool
+    // AddedLiquidity
   }
 
   function claimNFT() external onlyOwner {
@@ -284,12 +317,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     _amountOut = router.exactInputSingle(params);
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
     console.log('_swap() Function Call');
     console.log('expectedAmountOut: ', expectedAmountOut);
     console.log('amountOutMinimum: ', amountOutMinimum);
     console.log('_amountOut: ', _amountOut);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
   }
 
   function _mint(
@@ -370,12 +403,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       _amount0Added = addedAmount0;
       _amount1Added = addedAmount1;
 
-      console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+      console.log('-----------------------------');
       console.log('_addLiquidity() Function Call');
       console.log('addedLiquidity: ', addedLiquidity);
       console.log('addedAmount0: ', addedAmount0);
       console.log('addedAmount1: ', addedAmount1);
-      console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+      console.log('-----------------------------');
     } else {
       (_liquidityAdded, _amount0Added, _amount1Added) = _increaseLiquidity(
         _recipient,
@@ -416,7 +449,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
     console.log('_increaseLiquidity() Function Call');
     console.log('_amount0: ', _amount0);
     console.log('_amount1: ', _amount1);
@@ -424,7 +457,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     console.log('amount1MinAccepted: ', amount1MinAccepted);
     console.log('_amount0Increased: ', _amount0Increased);
     console.log('_amount1Increased: ', _amount1Increased);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
   }
 
   function _decreaseLiquidity(
@@ -459,7 +492,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
     _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
     console.log('_decreaseLiquidity() Function Call');
     console.log('_expectedAmount0: ', _expectedAmount0);
     console.log('_expectedAmount1: ', _expectedAmount1);
@@ -467,7 +500,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     console.log('amount1Min: ', amount1Min);
     console.log('amount0Decreased: ', _amount0Decreased);
     console.log('amount1Decreased: ', _amount1Decreased);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
   }
 
   function _collect(
@@ -496,6 +529,9 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       uint128(feeAmount0),
       uint128(feeAmount1)
     );
+
+    totalClaimedFees0 = totalClaimedFees0.add(amount0Collected);
+    totalClaimedFees1 = totalClaimedFees1.add(amount1Collected);
   }
 
   function _compound(address _recipient, uint16 _slippage)
@@ -534,7 +570,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint256 _amount1,
     uint16 _slippage
   ) internal returns (uint256 amount0, uint256 amount1) {
-    (uint256 targetAmount0, uint256 targetAmount1) = _calculateRatio(_amount0, _amount1);
+    (uint256 targetAmount0, uint256 targetAmount1) = _calculateRatio(
+      _amount0,
+      _amount1,
+      _lowerLimit(),
+      _upperLimit()
+    );
 
     amount0 = _amount0;
     amount1 = _amount1;
@@ -552,7 +593,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       amount0 = amount0.add(_swap(token1, diff, _slippage));
     }
 
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
     console.log('_convertRatio() Function Call');
     console.log('targetAmount0: ', targetAmount0);
     console.log('targetAmount1: ', targetAmount1);
@@ -560,22 +601,23 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     console.log('amount0: ', amount0);
     console.log('token1.balanceOf(address(this)) ', ERC20(token1).balanceOf(address(this)));
     console.log('amount1: ', amount1);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    console.log('-----------------------------');
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);
     assert(ERC20(token1).balanceOf(address(this)) >= amount1);
   }
 
-  function _calculateRatio(uint256 _amount0, uint256 _amount1)
-    internal
-    view
-    returns (uint256 amount0Ratioed, uint256 amount1Ratioed)
-  {
+  function _calculateRatio(
+    uint256 _amount0,
+    uint256 _amount1,
+    uint256 _lowerLimit,
+    uint256 _upperLimit
+  ) internal view returns (uint256 amount0Ratioed, uint256 amount1Ratioed) {
     uint256 sumConvertedToToken1 = _convert0ToToken1(_amount0, false).add(_amount1);
     (uint256 amount0ConvertedToToken1, uint256 amount1) = _applyRatio(
       sumConvertedToToken1,
-      _getLowerLimit(),
-      _getUpperLimit()
+      _lowerLimit,
+      _upperLimit
     );
     amount0Ratioed = _convert1ToToken0(amount0ConvertedToToken1, false);
     amount1Ratioed = amount1;
@@ -597,7 +639,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint256 _upperLimit,
     uint16 _precision
   ) internal view returns (uint256 _ratioToken0, uint256 _ratioToken1) {
-    (uint256 amount0, uint256 amount1) = _getAmountsForLiquidity(_lowerLimit, _upperLimit);
+    (uint256 amount0, uint256 amount1) = _getAmountsFromLiquidity(_lowerLimit, _upperLimit);
     uint256 amount0ConvertedToToken1 = _convert0ToToken1(amount0, false);
     uint256 sum = amount0ConvertedToToken1.add(amount1);
     _ratioToken0 = amount0ConvertedToToken1.mul(_precision).div(sum);
@@ -615,7 +657,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     view
     returns (uint256 amount0ConvertedToToken1)
   {
-    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _getPrice();
+    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _uintPrice();
 
     amount0ConvertedToToken1 = amount0.mul(price).div(10**ERC20(token0).decimals());
   }
@@ -625,19 +667,24 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     view
     returns (uint256 amount1ConvertedToToken0)
   {
-    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _getPrice();
+    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _uintPrice();
 
     amount1ConvertedToToken0 = amount1.mul(10**ERC20(token0).decimals()).div(price);
   }
 
-  function _getAmountsForLiquidity(uint256 _lowerLimit, uint256 _upperLimit)
+  function _getAmountsFromLiquidity(uint256 _lowerLimit, uint256 _upperLimit)
     internal
     view
     returns (uint256 _amount0, uint256 _amount1)
   {
     // Convert the manual entered range to ticks and then to sqrtPriceX96 in order to
     // utilize the available price range relative to tick spacing.
-    (int24 lowerTick, int24 upperTick) = _returnLimitInTicks(_lowerLimit, _upperLimit);
+    (int24 lowerTick, int24 upperTick) = Utils.convertLimitsToTicks(
+      _lowerLimit,
+      _upperLimit,
+      tickSpacing,
+      ERC20(token0).decimals()
+    );
 
     uint160 lowerLimitSqrtPricex96 = TickMath.getSqrtRatioAtTick(lowerTick);
     uint160 upperLimitSqrtPricex96 = TickMath.getSqrtRatioAtTick(upperTick);
@@ -650,103 +697,20 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     );
   }
 
-  function _returnLimitInTicks(uint256 lowerLimit, uint256 upperLimit)
-    internal
-    view
-    returns (int24 lowerTick, int24 upperTick)
-  {
-    int24 tickL = _getValidatedTickNumber(lowerLimit, ERC20(token0).decimals(), tickSpacing);
-    int24 tickU = _getValidatedTickNumber(upperLimit, ERC20(token0).decimals(), tickSpacing);
-    (lowerTick, upperTick) = Utils.orderTicks(tickL, tickU);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
-    console.log('_returnLimitInTicks Function Call');
-    console.log('tickL: ');
-    console.logInt(tickL);
-    console.log('tickU: ');
-    console.logInt(tickU);
-    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
-  }
-
-  function _getValidatedTickNumber(
-    uint256 price,
-    uint8 decimalsToken0,
-    int24 tickSpacing
-  ) internal pure returns (int24) {
-    int24 tick = TickMath.getTickAtSqrtRatio(Conversions.uintToSqrtPriceX96(price, decimalsToken0));
-    return _validateTick(tick, tickSpacing);
-  }
-
-  function _validateTick(int24 _tick, int24 _tickSpacing) internal pure returns (int24) {
-    if (_tickSpacing == 0) _tickSpacing = 1;
-    return (_tick / _tickSpacing) * _tickSpacing;
-  }
-
-  function _getLowerLimit() internal view returns (uint256) {
-    return
-      Conversions.sqrtPriceX96ToUint(
-        TickMath.getSqrtRatioAtTick(lowerTick),
-        ERC20(token0).decimals()
-      );
-  }
-
-  function _getUpperLimit() internal view returns (uint256) {
-    return
-      Conversions.sqrtPriceX96ToUint(
-        TickMath.getSqrtRatioAtTick(upperTick),
-        ERC20(token0).decimals()
-      );
-  }
-
   function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price0) {
     _price0 = _priceToken0(_getAveragePriceAtUpperLimit());
   }
 
   function _getAveragePriceAtUpperLimit() internal view returns (uint256 _price1) {
-    _price1 = Math.sqrt(_getLowerLimit().mul(_getUpperLimit()));
+    _price1 = Math.sqrt(_lowerLimit().mul(_upperLimit()));
   }
 
-  function _getTokenAmountsAtLowerLimit(uint128 _liquidity)
-    internal
-    view
-    returns (uint256 _amount0, uint256 _amount1)
-  {
-    (_amount0, _amount1) = _getAmountsFromLiquidity(
-      _liquidity,
-      TickMath.getSqrtRatioAtTick(lowerTick)
-    );
+  function _lowerLimit() internal view returns (uint256) {
+    return Utils.convertTickToUint(lowerTick, ERC20(token0).decimals());
   }
 
-  function _getTokenAmountsAtUpperLimit(uint128 _liquidity)
-    internal
-    view
-    returns (uint256 _amount0, uint256 _amount1)
-  {
-    (_amount0, _amount1) = _getAmountsFromLiquidity(
-      _liquidity,
-      TickMath.getSqrtRatioAtTick(upperTick)
-    );
-  }
-
-  function _getPriceFromLiquidity(uint128 liquidity, uint160 sqrtPriceX96)
-    internal
-    view
-    returns (uint256)
-  {
-    (uint256 amount0, uint256 amount1) = _getAmountsFromLiquidity(liquidity, sqrtPriceX96);
-    return (amount1.mul(10**ERC20(token0).decimals())).div(amount0);
-  }
-
-  function _getAmountsFromLiquidity(uint128 liquidity, uint160 sqrtPriceX96)
-    internal
-    pure
-    returns (uint256 _amount0, uint256 _amount1)
-  {
-    _amount0 = FullMath.mulDiv(liquidity, FixedPoint96.Q96, sqrtPriceX96);
-    _amount1 = FullMath.mulDiv(liquidity, sqrtPriceX96, FixedPoint96.Q96);
-  }
-
-  function _getPrice() internal view returns (uint256) {
-    return Conversions.sqrtPriceX96ToUint(_sqrtPriceX96(), ERC20(token0).decimals());
+  function _upperLimit() internal view returns (uint256) {
+    return Utils.convertTickToUint(upperTick, ERC20(token0).decimals());
   }
 
   function _oracleUintPrice(uint32 _seconds) internal view returns (uint256) {
@@ -758,21 +722,15 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     return TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
   }
 
+  function _uintPrice() internal view returns (uint256) {
+    return Conversions.sqrtPriceX96ToUint(_sqrtPriceX96(), ERC20(token0).decimals());
+  }
+
   function _sqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
     (sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
   }
 
   function _liquidity() internal view returns (uint128) {
     return IUniswapV3Pool(pool).liquidity();
-  }
-
-  // Get principal from a specific position.
-  function _getPrincipal() internal view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = NFPM.principal(tokenId, _sqrtPriceX96());
-  }
-
-  // Get unclaimed fees from range.
-  function _getFees() internal view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = NFPM.fees(tokenId);
   }
 }

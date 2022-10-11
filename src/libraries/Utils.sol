@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.5.0 <0.8.14;
 
+import '@openzeppelin/contracts/math/SafeMath.sol';
+
+import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
+import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
+
 import '@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol';
+
 import './Conversions.sol';
 
 library Utils {
+  using SafeMath for uint256;
+
   function getPoolAddress(
     address tokenA,
     address tokenB,
@@ -27,12 +35,76 @@ library Utils {
     (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
   }
 
+  // _returnLimitInTicks
+  function convertLimitsToTicks(
+    uint256 lowerLimit,
+    uint256 upperLimit,
+    int24 tickSpacing,
+    uint8 decimalsToken0
+  ) internal pure returns (int24 lowerTick, int24 upperTick) {
+    int24 tickL = getValidatedTickNumber(lowerLimit, decimalsToken0, tickSpacing);
+    int24 tickU = getValidatedTickNumber(upperLimit, decimalsToken0, tickSpacing);
+    (lowerTick, upperTick) = orderTicks(tickL, tickU);
+  }
+
   function orderTicks(int24 tick0, int24 tick1)
     internal
     pure
     returns (int24 tickLower, int24 tickUpper)
   {
     (tickLower, tickUpper) = tick1 < tick0 ? (tick1, tick0) : (tick0, tick1);
+  }
+
+  function getValidatedTickNumber(
+    uint256 price,
+    uint8 decimalsToken0,
+    int24 tickSpacing
+  ) internal pure returns (int24) {
+    int24 tick = TickMath.getTickAtSqrtRatio(Conversions.uintToSqrtPriceX96(price, decimalsToken0));
+    return validateTick(tick, tickSpacing);
+  }
+
+  function validateTick(int24 tick, int24 tickSpacing) internal pure returns (int24) {
+    if (tickSpacing == 0) tickSpacing = 1;
+    return (tick / tickSpacing) * tickSpacing;
+  }
+
+  function convertTickToUint(int24 tick, uint8 decimalsToken0) internal pure returns (uint256) {
+    return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
+  }
+
+  function getTokenAmountsAtLowerTick(uint128 liquidity, int24 lowerTick)
+    internal
+    pure
+    returns (uint256 amount0, uint256 amount1)
+  {
+    (amount0, amount1) = getAmountsFromLiquidity(liquidity, TickMath.getSqrtRatioAtTick(lowerTick));
+  }
+
+  function getTokenAmountsAtUpperTick(uint128 liquidity, int24 upperTick)
+    internal
+    pure
+    returns (uint256 amount0, uint256 amount1)
+  {
+    (amount0, amount1) = getAmountsFromLiquidity(liquidity, TickMath.getSqrtRatioAtTick(upperTick));
+  }
+
+  function getPriceFromLiquidity(
+    uint128 liquidity,
+    uint160 sqrtPriceX96,
+    uint8 decimalsToken0
+  ) internal pure returns (uint256) {
+    (uint256 amount0, uint256 amount1) = getAmountsFromLiquidity(liquidity, sqrtPriceX96);
+    return (amount1.mul(10**decimalsToken0)).div(amount0);
+  }
+
+  function getAmountsFromLiquidity(uint128 liquidity, uint160 sqrtPriceX96)
+    internal
+    pure
+    returns (uint256 amount0, uint256 amount1)
+  {
+    amount0 = FullMath.mulDiv(liquidity, FixedPoint96.Q96, sqrtPriceX96);
+    amount1 = FullMath.mulDiv(liquidity, sqrtPriceX96, FixedPoint96.Q96);
   }
 
   function sqrt(uint256 x) internal pure returns (uint256 y) {
