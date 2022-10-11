@@ -95,6 +95,9 @@ library Utils {
     uint8 decimalsToken0
   ) internal pure returns (uint256) {
     (uint256 amount0, uint256 amount1) = getAmountsFromLiquidity(liquidity, sqrtPriceX96);
+
+    if (amount0 == 0) amount0 = 1;
+
     return (amount1.mul(10**decimalsToken0)).div(amount0);
   }
 
@@ -105,6 +108,17 @@ library Utils {
   {
     amount0 = FullMath.mulDiv(liquidity, FixedPoint96.Q96, sqrtPriceX96);
     amount1 = FullMath.mulDiv(liquidity, sqrtPriceX96, FixedPoint96.Q96);
+  }
+
+  function applySlippageTolerance(
+    bool positive,
+    uint256 amount,
+    uint16 slippage,
+    uint16 resolution
+  ) internal pure returns (uint256 amountAccepted) {
+    amountAccepted = positive
+      ? (amount.mul(slippage).div(resolution)).add(amount)
+      : amount.sub(amount.mul(slippage).div(resolution));
   }
 
   function sqrt(uint256 x) internal pure returns (uint256 y) {

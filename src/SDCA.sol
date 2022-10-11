@@ -66,11 +66,20 @@ contract SDCA is Test {
       ? _convert1ToToken0(pool, _amountIn, true)
       : _convert0ToToken1(pool, _amountIn, true);
 
-    uint256 amountOutMinimum = _applySlippageTolerance(false, expectedAmountOut, _slippage);
+    uint256 amountOutMinimum = Utils.applySlippageTolerance(
+      false,
+      expectedAmountOut,
+      _slippage,
+      resolution
+    );
 
     uint160 sqrtPriceLimitX96 = _tokenIn == pool.token1()
-      ? uint160(_applySlippageTolerance(true, uint256(_sqrtPriceX96(pool)), _slippage))
-      : uint160(_applySlippageTolerance(false, uint256(_sqrtPriceX96(pool)), _slippage));
+      ? uint160(
+        Utils.applySlippageTolerance(true, uint256(_sqrtPriceX96(pool)), _slippage, resolution)
+      )
+      : uint160(
+        Utils.applySlippageTolerance(false, uint256(_sqrtPriceX96(pool)), _slippage, resolution)
+      );
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: _tokenIn,
@@ -95,16 +104,6 @@ contract SDCA is Test {
 
   function _sqrtPriceX96(IUniswapV3Pool pool) internal view returns (uint160 sqrtPriceX96) {
     (sqrtPriceX96, , , , , , ) = pool.slot0();
-  }
-
-  function _applySlippageTolerance(
-    bool _positive,
-    uint256 _amount,
-    uint16 _slippage
-  ) internal pure returns (uint256 _amountAccepted) {
-    _amountAccepted = _positive
-      ? (_amount.mul(_slippage).div(resolution)).add(_amount)
-      : _amount.sub(_amount.mul(_slippage).div(resolution));
   }
 
   function _convert0ToToken1(
