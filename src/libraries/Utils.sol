@@ -35,7 +35,6 @@ library Utils {
     (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
   }
 
-  // _returnLimitInTicks
   function convertLimitsToTicks(
     uint256 lowerLimit,
     uint256 upperLimit,
