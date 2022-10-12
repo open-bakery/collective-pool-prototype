@@ -28,6 +28,7 @@ import '../src/RangePool.sol';
 import '../src/PoolFactory.sol';
 import '../src/libraries/Conversions.sol';
 import '../src/SDCA.sol';
+import '../src/DepositRatioCalculator.sol';
 
 contract UniswapTest is Test, IERC721Receiver {
   using PositionValue for NonfungiblePositionManager;
@@ -43,6 +44,7 @@ contract UniswapTest is Test, IERC721Receiver {
   address ARB_USDC = 0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8;
   address ARB_GMX = 0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a;
   address MAIN_WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+  address MAIN_WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
   address MAIN_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
   address MAIN_DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
   address MAIN_FRAX = 0x853d955aCEf822Db058eb8505911ED77F175b99e;
@@ -65,7 +67,10 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   function testMainnet() public {
-    testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
+    DepositRatioCalculator drc = new DepositRatioCalculator();
+    drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
+
+    //testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
     // testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     // testPoolConstruct(MAIN_USDC, MAIN_WETH, 500, 1000000000000000, 500000000000000);
     // testSwapFromDCA(MAIN_APE, MAIN_WETH, 3000, 64_000 ether, 5_00);

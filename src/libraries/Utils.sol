@@ -26,6 +26,15 @@ library Utils {
     return Conversions.sqrtPriceX96ToUint(sqrtPriceX96, decimalsToken0);
   }
 
+  function priceToken0(
+    uint256 priceToken1,
+    uint8 decimalsToken0,
+    uint8 decimalsToken1
+  ) internal pure returns (uint256) {
+    if (priceToken1 == 0) priceToken1 = 1;
+    return (10**(SafeMath.add(decimalsToken0, decimalsToken1))).div(priceToken1);
+  }
+
   function orderTokens(address tokenA, address tokenB)
     internal
     pure
@@ -68,7 +77,11 @@ library Utils {
     return (tick / tickSpacing) * tickSpacing;
   }
 
-  function convertTickToUint(int24 tick, uint8 decimalsToken0) internal pure returns (uint256) {
+  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0)
+    internal
+    pure
+    returns (uint256)
+  {
     return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
   }
 

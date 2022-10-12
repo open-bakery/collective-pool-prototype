@@ -654,12 +654,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint256 _upperLimit
   ) internal view returns (uint256 _ratio0InToken1, uint256 _ratio1) {
     uint16 precision = 10_000;
-    (uint256 ratio0, uint256 ratio1) = _getRatioForLiquidity(_lowerLimit, _upperLimit, precision);
+    (uint256 ratio0, uint256 ratio1) = _getRatioFromLiquidity(_lowerLimit, _upperLimit, precision);
     _ratio0InToken1 = _amountSumInToken1.mul(ratio0).div(precision);
     _ratio1 = _amountSumInToken1.mul(ratio1).div(precision);
   }
 
-  function _getRatioForLiquidity(
+  function _getRatioFromLiquidity(
     uint256 _lowerLimit,
     uint256 _upperLimit,
     uint16 _precision
@@ -735,11 +735,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   }
 
   function _lowerLimit() internal view returns (uint256) {
-    return Utils.convertTickToUint(lowerTick, ERC20(token0).decimals());
+    return Utils.convertTickToPriceUint(lowerTick, ERC20(token0).decimals());
   }
 
   function _upperLimit() internal view returns (uint256) {
-    return Utils.convertTickToUint(upperTick, ERC20(token0).decimals());
+    return Utils.convertTickToPriceUint(upperTick, ERC20(token0).decimals());
   }
 
   function _oracleUintPrice(uint32 _seconds) internal view returns (uint256) {
