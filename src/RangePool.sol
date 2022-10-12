@@ -28,8 +28,10 @@ import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 
+import './libraries/RatioCalculator.sol';
 import './libraries/Conversions.sol';
 import './libraries/Utils.sol';
+import './libraries/PoolUtils.sol';
 import './libraries/Math.sol';
 import './LP.sol';
 
@@ -41,17 +43,19 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   using SafeERC20 for ERC20;
   using SafeMath for uint256;
   using Address for address;
+  using RatioCalculator for uint160;
+  using PoolUtils for IUniswapV3Pool;
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
   NonfungiblePositionManager public constant NFPM =
     NonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
+  IUniswapV3Pool public pool;
   LP public lpToken;
 
   address public token0;
   address public token1;
-  address public pool;
 
   uint24 public fee;
 
@@ -81,17 +85,24 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     if (_lowerLimitInTokenB == 0) _lowerLimitInTokenB = 1;
 
-    pool = Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory);
-
-    (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
+    pool = IUniswapV3Pool(IUniswapV3Factory(uniswapFactory).getPool(_tokenA, _tokenB, _fee));
+    (token0, token1) = (pool.token0(), pool.token1());
 
     if (_tokenA != token0) {
-      _lowerLimitInTokenB = _priceToken0(_lowerLimitInTokenB);
-      _upperLimitInTokenB = _priceToken0(_upperLimitInTokenB);
+      _lowerLimitInTokenB = Utils.priceToken0(
+        _lowerLimitInTokenB,
+        ERC20(token0).decimals(),
+        ERC20(token1).decimals()
+      );
+      _upperLimitInTokenB = Utils.priceToken0(
+        _upperLimitInTokenB,
+        ERC20(token0).decimals(),
+        ERC20(token1).decimals()
+      );
     }
 
     fee = _fee;
-    tickSpacing = IUniswapV3Pool(pool).tickSpacing();
+    tickSpacing = pool.tickSpacing();
 
     (lowerTick, upperTick) = Utils.convertLimitsToTicks(
       _lowerLimitInTokenB,
@@ -120,7 +131,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   }
 
   function principal() external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = NFPM.principal(tokenId, _sqrtPriceX96());
+    (amount0, amount1) = NFPM.principal(tokenId, pool.sqrtPriceX96());
   }
 
   function unclaimedFees() external view returns (uint256 amount0, uint256 amount1) {
@@ -128,33 +139,42 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   }
 
   function sqrtPriceX96() external view returns (uint160) {
-    return _sqrtPriceX96();
+    return pool.sqrtPriceX96();
   }
 
   function price() external view returns (uint256) {
-    return _uintPrice();
+    return pool.uintPrice();
   }
 
   function priceFromLiquidity() public view returns (uint256) {
-    return Utils.getPriceFromLiquidity(_liquidity(), _sqrtPriceX96(), ERC20(token0).decimals());
+    return
+      Utils.getPriceFromLiquidity(pool.liquidity(), pool.sqrtPriceX96(), ERC20(token0).decimals());
   }
 
   function oraclePrice(uint32 secondsElapsed) external view returns (uint256) {
-    return _oracleUintPrice(secondsElapsed);
+    return pool.oracleUintPrice(secondsElapsed);
   }
 
   function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
     priceToken1 = Utils.getPriceFromLiquidity(
-      _liquidity(),
-      _sqrtPriceX96(),
+      pool.liquidity(),
+      pool.sqrtPriceX96(),
       ERC20(token0).decimals()
     );
-    priceToken0 = _priceToken0(priceToken1);
+    priceToken0 = Utils.priceToken0(
+      priceToken1,
+      ERC20(token0).decimals(),
+      ERC20(token1).decimals()
+    );
   }
 
   function pricesFromLiquidity() external view returns (uint256 priceToken0, uint256 priceToken1) {
     priceToken1 = priceFromLiquidity();
-    priceToken0 = _priceToken0(priceToken1);
+    priceToken0 = Utils.priceToken0(
+      priceToken1,
+      ERC20(token0).decimals(),
+      ERC20(token1).decimals()
+    );
   }
 
   function oraclePrices(uint32 secondsElapsed)
@@ -162,8 +182,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     view
     returns (uint256 priceToken0, uint256 priceToken1)
   {
-    priceToken1 = _oracleUintPrice(secondsElapsed);
-    priceToken0 = _priceToken0(priceToken1);
+    priceToken1 = pool.oracleUintPrice(secondsElapsed);
+    priceToken0 = Utils.priceToken0(
+      priceToken1,
+      ERC20(token0).decimals(),
+      ERC20(token1).decimals()
+    );
   }
 
   function lowerLimit() external view returns (uint256) {
@@ -213,11 +237,14 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     view
     returns (uint256 amount0Ratioed, uint256 amount1Ratioed)
   {
-    (amount0Ratioed, amount1Ratioed) = _calculateRatio(
+    (amount0Ratioed, amount1Ratioed) = pool.sqrtPriceX96().calculateRatio(
+      pool.liquidity(),
       amount0,
       amount1,
-      _lowerLimit(),
-      _upperLimit()
+      lowerTick,
+      upperTick,
+      ERC20(token0).decimals(),
+      resolution
     );
   }
 
@@ -294,8 +321,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     _tokenIn.safeApprove(address(router), _amountIn);
 
     uint256 expectedAmountOut = tokenOut == token0
-      ? _convert1ToToken0(_amountIn, true)
-      : _convert0ToToken1(_amountIn, true);
+      ? pool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(_amountIn, ERC20(token0).decimals())
+      : pool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(
+        _amountIn,
+        ERC20(token0).decimals()
+      );
 
     uint256 amountOutMinimum = Utils.applySlippageTolerance(
       false,
@@ -305,9 +335,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     );
 
     uint160 sqrtPriceLimitX96 = _tokenIn == token1
-      ? uint160(Utils.applySlippageTolerance(true, uint256(_sqrtPriceX96()), _slippage, resolution))
+      ? uint160(
+        Utils.applySlippageTolerance(true, uint256(pool.sqrtPriceX96()), _slippage, resolution)
+      )
       : uint160(
-        Utils.applySlippageTolerance(false, uint256(_sqrtPriceX96()), _slippage, resolution)
+        Utils.applySlippageTolerance(false, uint256(pool.sqrtPriceX96()), _slippage, resolution)
       );
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
@@ -496,7 +528,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint32 _seconds = oracleSeconds;
 
     (uint256 _expectedAmount0, uint256 _expectedAmount1) = LiquidityAmounts.getAmountsForLiquidity(
-      _oracleSqrtPricex96(_seconds),
+      pool.oracleSqrtPricex96(_seconds),
       TickMath.getSqrtRatioAtTick(lowerTick),
       TickMath.getSqrtRatioAtTick(upperTick),
       _liquidity
@@ -595,11 +627,14 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     uint256 _amount1,
     uint16 _slippage
   ) internal returns (uint256 amount0, uint256 amount1) {
-    (uint256 targetAmount0, uint256 targetAmount1) = _calculateRatio(
+    (uint256 targetAmount0, uint256 targetAmount1) = pool.sqrtPriceX96().calculateRatio(
+      pool.liquidity(),
       _amount0,
       _amount1,
-      _lowerLimit(),
-      _upperLimit()
+      lowerTick,
+      upperTick,
+      ERC20(token0).decimals(),
+      resolution
     );
 
     amount0 = _amount0;
@@ -619,7 +654,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     }
 
     console.log('-----------------------------');
-    console.log('_convertRatio() Function Call');
+    console.log('_convertToRatio() Function Call');
     console.log('targetAmount0: ', targetAmount0);
     console.log('targetAmount1: ', targetAmount1);
     console.log('token0.balanceOf(address(this)): ', ERC20(token0).balanceOf(address(this)));
@@ -632,102 +667,12 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     assert(ERC20(token1).balanceOf(address(this)) >= amount1);
   }
 
-  function _calculateRatio(
-    uint256 _amount0,
-    uint256 _amount1,
-    uint256 _lowerLimit,
-    uint256 _upperLimit
-  ) internal view returns (uint256 amount0Ratioed, uint256 amount1Ratioed) {
-    uint256 sumConvertedToToken1 = _convert0ToToken1(_amount0, false).add(_amount1);
-    (uint256 amount0ConvertedToToken1, uint256 amount1) = _applyRatio(
-      sumConvertedToToken1,
-      _lowerLimit,
-      _upperLimit
-    );
-    amount0Ratioed = _convert1ToToken0(amount0ConvertedToToken1, false);
-    amount1Ratioed = amount1;
-  }
-
-  function _applyRatio(
-    uint256 _amountSumInToken1,
-    uint256 _lowerLimit,
-    uint256 _upperLimit
-  ) internal view returns (uint256 _ratio0InToken1, uint256 _ratio1) {
-    uint16 precision = 10_000;
-    (uint256 ratio0, uint256 ratio1) = _getRatioFromLiquidity(_lowerLimit, _upperLimit, precision);
-    _ratio0InToken1 = _amountSumInToken1.mul(ratio0).div(precision);
-    _ratio1 = _amountSumInToken1.mul(ratio1).div(precision);
-  }
-
-  function _getRatioFromLiquidity(
-    uint256 _lowerLimit,
-    uint256 _upperLimit,
-    uint16 _precision
-  ) internal view returns (uint256 _ratioToken0, uint256 _ratioToken1) {
-    (uint256 amount0, uint256 amount1) = _getAmountsFromLiquidity(_lowerLimit, _upperLimit);
-    uint256 amount0ConvertedToToken1 = _convert0ToToken1(amount0, false);
-    uint256 sum = amount0ConvertedToToken1.add(amount1);
-    if (sum == 0) sum = 1;
-    _ratioToken0 = amount0ConvertedToToken1.mul(_precision).div(sum);
-    _ratioToken1 = amount1.mul(_precision).div(sum);
-  }
-
-  function _priceToken0(uint256 _priceToken1) internal view returns (uint256) {
-    uint8 decimalsToken0 = ERC20(token0).decimals();
-    uint8 decimalsToken1 = ERC20(token1).decimals();
-    if (_priceToken1 == 0) _priceToken1 = 1;
-    return (10**(SafeMath.add(decimalsToken0, decimalsToken1))).div(_priceToken1);
-  }
-
-  function _convert0ToToken1(uint256 amount0, bool useOracle)
-    internal
-    view
-    returns (uint256 amount0ConvertedToToken1)
-  {
-    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _uintPrice();
-
-    amount0ConvertedToToken1 = amount0.mul(price).div(10**ERC20(token0).decimals());
-  }
-
-  function _convert1ToToken0(uint256 amount1, bool useOracle)
-    internal
-    view
-    returns (uint256 amount1ConvertedToToken0)
-  {
-    uint256 price = useOracle ? _oracleUintPrice(oracleSeconds) : _uintPrice();
-
-    if (price == 0) return 0;
-
-    amount1ConvertedToToken0 = amount1.mul(10**ERC20(token0).decimals()).div(price);
-  }
-
-  function _getAmountsFromLiquidity(uint256 _lowerLimit, uint256 _upperLimit)
-    internal
-    view
-    returns (uint256 _amount0, uint256 _amount1)
-  {
-    // Convert the manual entered range to ticks and then to sqrtPriceX96 in order to
-    // utilize the available price range relative to tick spacing.
-    (int24 lowerTick, int24 upperTick) = Utils.convertLimitsToTicks(
-      _lowerLimit,
-      _upperLimit,
-      tickSpacing,
-      ERC20(token0).decimals()
-    );
-
-    uint160 lowerLimitSqrtPricex96 = TickMath.getSqrtRatioAtTick(lowerTick);
-    uint160 upperLimitSqrtPricex96 = TickMath.getSqrtRatioAtTick(upperTick);
-
-    (_amount0, _amount1) = LiquidityAmounts.getAmountsForLiquidity(
-      _sqrtPriceX96(),
-      lowerLimitSqrtPricex96,
-      upperLimitSqrtPricex96,
-      _liquidity()
-    );
-  }
-
   function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price0) {
-    _price0 = _priceToken0(_getAveragePriceAtUpperLimit());
+    _price0 = Utils.priceToken0(
+      _getAveragePriceAtUpperLimit(),
+      ERC20(token0).decimals(),
+      ERC20(token1).decimals()
+    );
   }
 
   function _getAveragePriceAtUpperLimit() internal view returns (uint256 _price1) {
@@ -740,26 +685,5 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
   function _upperLimit() internal view returns (uint256) {
     return Utils.convertTickToPriceUint(upperTick, ERC20(token0).decimals());
-  }
-
-  function _oracleUintPrice(uint32 _seconds) internal view returns (uint256) {
-    return Conversions.sqrtPriceX96ToUint(_oracleSqrtPricex96(_seconds), ERC20(token0).decimals());
-  }
-
-  function _oracleSqrtPricex96(uint32 _seconds) internal view returns (uint160) {
-    (int24 arithmeticMeanTick, ) = OracleLibrary.consult(pool, _seconds);
-    return TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
-  }
-
-  function _uintPrice() internal view returns (uint256) {
-    return Conversions.sqrtPriceX96ToUint(_sqrtPriceX96(), ERC20(token0).decimals());
-  }
-
-  function _sqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
-    (sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
-  }
-
-  function _liquidity() internal view returns (uint128) {
-    return IUniswapV3Pool(pool).liquidity();
   }
 }

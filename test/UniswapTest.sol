@@ -67,10 +67,10 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   function testMainnet() public {
-    DepositRatioCalculator drc = new DepositRatioCalculator();
-    drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
+    // DepositRatioCalculator drc = new DepositRatioCalculator();
+    // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
 
-    //testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
+    testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
     // testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     // testPoolConstruct(MAIN_USDC, MAIN_WETH, 500, 1000000000000000, 500000000000000);
     // testSwapFromDCA(MAIN_APE, MAIN_WETH, 3000, 64_000 ether, 5_00);

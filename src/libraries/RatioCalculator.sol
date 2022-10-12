@@ -19,7 +19,7 @@ library RatioCalculator {
     int24 upperTick,
     uint8 decimalsToken0,
     uint16 precision
-  ) internal pure returns (uint256 amount0Ratioed, uint256 amount1Ratioed) {
+  ) internal view returns (uint256 amount0Ratioed, uint256 amount1Ratioed) {
     (uint256 amount0ConvertedToToken1, uint256 amount1) = _applyRatio(
       sqrtPriceX96,
       liquidity,

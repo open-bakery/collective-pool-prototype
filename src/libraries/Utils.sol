@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.5.0 <0.8.14;
 
+import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
+
+import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
@@ -20,10 +23,6 @@ library Utils {
     address uniswapFactory
   ) internal pure returns (address) {
     return PoolAddress.computeAddress(uniswapFactory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
-  }
-
-  function getPrice(uint160 sqrtPriceX96, uint8 decimalsToken0) internal pure returns (uint256) {
-    return Conversions.sqrtPriceX96ToUint(sqrtPriceX96, decimalsToken0);
   }
 
   function priceToken0(
@@ -50,31 +49,9 @@ library Utils {
     int24 tickSpacing,
     uint8 decimalsToken0
   ) internal pure returns (int24 lowerTick, int24 upperTick) {
-    int24 tickL = getValidatedTickNumber(lowerLimit, decimalsToken0, tickSpacing);
-    int24 tickU = getValidatedTickNumber(upperLimit, decimalsToken0, tickSpacing);
-    (lowerTick, upperTick) = orderTicks(tickL, tickU);
-  }
-
-  function orderTicks(int24 tick0, int24 tick1)
-    internal
-    pure
-    returns (int24 tickLower, int24 tickUpper)
-  {
-    (tickLower, tickUpper) = tick1 < tick0 ? (tick1, tick0) : (tick0, tick1);
-  }
-
-  function getValidatedTickNumber(
-    uint256 price,
-    uint8 decimalsToken0,
-    int24 tickSpacing
-  ) internal pure returns (int24) {
-    int24 tick = TickMath.getTickAtSqrtRatio(Conversions.uintToSqrtPriceX96(price, decimalsToken0));
-    return validateTick(tick, tickSpacing);
-  }
-
-  function validateTick(int24 tick, int24 tickSpacing) internal pure returns (int24) {
-    if (tickSpacing == 0) tickSpacing = 1;
-    return (tick / tickSpacing) * tickSpacing;
+    int24 tickL = _getValidatedTickNumber(lowerLimit, decimalsToken0, tickSpacing);
+    int24 tickU = _getValidatedTickNumber(upperLimit, decimalsToken0, tickSpacing);
+    (lowerTick, upperTick) = _orderTicks(tickL, tickU);
   }
 
   function convertTickToPriceUint(int24 tick, uint8 decimalsToken0)
@@ -133,12 +110,25 @@ library Utils {
       : amount.sub(amount.mul(slippage).div(resolution));
   }
 
-  function sqrt(uint256 x) internal pure returns (uint256 y) {
-    uint256 z = (x + 1) / 2;
-    y = x;
-    while (z < y) {
-      y = z;
-      z = (x / z + z) / 2;
-    }
+  function _getValidatedTickNumber(
+    uint256 price,
+    uint8 decimalsToken0,
+    int24 tickSpacing
+  ) private pure returns (int24) {
+    int24 tick = TickMath.getTickAtSqrtRatio(Conversions.uintToSqrtPriceX96(price, decimalsToken0));
+    return _validateTick(tick, tickSpacing);
+  }
+
+  function _validateTick(int24 tick, int24 tickSpacing) private pure returns (int24) {
+    if (tickSpacing == 0) tickSpacing = 1;
+    return (tick / tickSpacing) * tickSpacing;
+  }
+
+  function _orderTicks(int24 tick0, int24 tick1)
+    private
+    pure
+    returns (int24 tickLower, int24 tickUpper)
+  {
+    (tickLower, tickUpper) = tick1 < tick0 ? (tick1, tick0) : (tick0, tick1);
   }
 }
