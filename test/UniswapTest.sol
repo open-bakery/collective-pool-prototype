@@ -69,7 +69,6 @@ contract UniswapTest is Test, IERC721Receiver {
   function testMainnet() public {
     // DepositRatioCalculator drc = new DepositRatioCalculator();
     // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
-
     testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
     // testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     // testPoolConstruct(MAIN_USDC, MAIN_WETH, 500, 1000000000000000, 500000000000000);
@@ -189,6 +188,7 @@ contract UniswapTest is Test, IERC721Receiver {
     deal(rangePool.token1(), address(this), amount1);
 
     rangePool.addLiquidity(amount0, amount1, slippage);
+
     ERC20(rangePool.lpToken()).approve(address(rangePool), type(uint256).max);
 
     (uint256 amount0Decreased, uint256 amount1Decreased) = rangePool.decreaseLiquidity(
@@ -296,13 +296,6 @@ contract UniswapTest is Test, IERC721Receiver {
     console.log('Price Token 0: ', price0);
     console.log('Price Token 1: ', price1);
     console.log('---------------------------------------');
-  }
-
-  function logPricesFromLiquidity(RangePool rangePool) public view {
-    (uint256 price0, uint256 price1) = rangePool.pricesFromLiquidity();
-
-    console.log('Price From Liquidity Token 0: ', price0);
-    console.log('Price From Liquidity Token 1: ', price1);
   }
 
   function logOraclePrices(RangePool rangePool, uint32 _seconds) public view {

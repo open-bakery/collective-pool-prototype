@@ -25,6 +25,15 @@ library Utils {
     return PoolAddress.computeAddress(uniswapFactory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
   }
 
+  function orderTokens(address tokenA, address tokenB)
+    internal
+    pure
+    returns (address token0, address token1)
+  {
+    require(tokenA != tokenB);
+    (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+  }
+
   function priceToken0(
     uint256 priceToken1,
     uint8 decimalsToken0,
@@ -34,13 +43,12 @@ library Utils {
     return (10**(SafeMath.add(decimalsToken0, decimalsToken1))).div(priceToken1);
   }
 
-  function orderTokens(address tokenA, address tokenB)
+  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0)
     internal
     pure
-    returns (address token0, address token1)
+    returns (uint256)
   {
-    require(tokenA != tokenB);
-    (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+    return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
   }
 
   function convertLimitsToTicks(
@@ -54,43 +62,7 @@ library Utils {
     (lowerTick, upperTick) = _orderTicks(tickL, tickU);
   }
 
-  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0)
-    internal
-    pure
-    returns (uint256)
-  {
-    return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
-  }
-
-  function getTokenAmountsAtLowerTick(uint128 liquidity, int24 lowerTick)
-    internal
-    pure
-    returns (uint256 amount0, uint256 amount1)
-  {
-    (amount0, amount1) = getAmountsFromLiquidity(liquidity, TickMath.getSqrtRatioAtTick(lowerTick));
-  }
-
-  function getTokenAmountsAtUpperTick(uint128 liquidity, int24 upperTick)
-    internal
-    pure
-    returns (uint256 amount0, uint256 amount1)
-  {
-    (amount0, amount1) = getAmountsFromLiquidity(liquidity, TickMath.getSqrtRatioAtTick(upperTick));
-  }
-
-  function getPriceFromLiquidity(
-    uint128 liquidity,
-    uint160 sqrtPriceX96,
-    uint8 decimalsToken0
-  ) internal pure returns (uint256) {
-    (uint256 amount0, uint256 amount1) = getAmountsFromLiquidity(liquidity, sqrtPriceX96);
-
-    if (amount0 == 0) amount0 = 1;
-
-    return (amount1.mul(10**decimalsToken0)).div(amount0);
-  }
-
-  function getAmountsFromLiquidity(uint128 liquidity, uint160 sqrtPriceX96)
+  function getAmounts(uint128 liquidity, uint160 sqrtPriceX96)
     internal
     pure
     returns (uint256 amount0, uint256 amount1)

@@ -5,7 +5,6 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
@@ -21,10 +20,6 @@ library PoolUtils {
     (sqrtPriceX96, , , , , , ) = pool.slot0();
   }
 
-  function uintPrice(IUniswapV3Pool pool) internal view returns (uint256) {
-    return Conversions.sqrtPriceX96ToUint(sqrtPriceX96(pool), ERC20(pool.token0()).decimals());
-  }
-
   function oracleSqrtPricex96(IUniswapV3Pool pool, uint32 elapsedSeconds)
     internal
     view
@@ -32,6 +27,10 @@ library PoolUtils {
   {
     (int24 arithmeticMeanTick, ) = OracleLibrary.consult(address(pool), elapsedSeconds);
     return TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
+  }
+
+  function uintPrice(IUniswapV3Pool pool) internal view returns (uint256) {
+    return Conversions.sqrtPriceX96ToUint(sqrtPriceX96(pool), ERC20(pool.token0()).decimals());
   }
 
   function oracleUintPrice(IUniswapV3Pool pool, uint32 elapsedSeconds)
