@@ -33,8 +33,8 @@ contract UnitTest is Test, LocalVars, Logs, IERC721Receiver {
   }
 
   function testMainnet() public {
-    addLiquidity(20_000, 5 ether, 1_00);
-    increaseLiquidity(5_000, 1 ether, 1_00);
+    addLiquidity(20_000_000000, 5 ether, 1_00);
+    increaseLiquidity(4_000_000000, 1 ether, 1_00);
     // DepositRatioCalculator drc = new DepositRatioCalculator();
     // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
     // testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);

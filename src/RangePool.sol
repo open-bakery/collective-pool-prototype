@@ -2,8 +2,6 @@
 pragma solidity >=0.5.0 <0.8.0;
 pragma abicoder v2;
 
-import 'forge-std/Test.sol';
-
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
@@ -31,11 +29,9 @@ import './libraries/PoolUtils.sol';
 import './libraries/Math.sol';
 import './LP.sol';
 
-import './logs/Logs.sol';
-
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
-contract RangePool is IERC721Receiver, Test, Logs, Ownable {
+contract RangePool is IERC721Receiver, Ownable {
   using PositionValue for NonfungiblePositionManager;
   using PoolUtils for IUniswapV3Pool;
   using TransferHelper for address;
@@ -66,6 +62,9 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
   uint256 public totalClaimedFees1;
 
   uint16 constant resolution = 10_000;
+
+  event liquidityAdded(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event liquidityRemoved(address indexed recipiend, uint256 amount0, uint256 amount1, uint128 liquidity);
 
   constructor(
     address _tokenA,
@@ -111,8 +110,6 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     from;
     id;
     data;
-
-    logr('onERC721Received()', ['0', '0', '0', '0', '0', '0'], [uint256(0), 0, 0, 0, 0, 0]);
 
     return this.onERC721Received.selector;
   }
@@ -287,12 +284,6 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     });
 
     _amountOut = router.exactInputSingle(params);
-
-    logr(
-      '_swap()',
-      ['expectedAmountOut', 'amountOutMinimum', '_amountOut', '0', '0', '0'],
-      [uint256(expectedAmountOut), amountOutMinimum, _amountOut, 0, 0, 0]
-    );
   }
 
   function _addLiquidity(
@@ -401,12 +392,6 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     (_liquidityIncreased, _amount0Increased, _amount1Increased) = NFPM.increaseLiquidity(params);
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
-
-    logr(
-      '_increaseLiquidity()',
-      ['_amount0', '_amount1', 'amount0MinAccepted', 'amount1MinAccepted', '_amount0Increased', '_amount1Increased'],
-      [uint256(_amount0), _amount1, amount0MinAccepted, amount1MinAccepted, _amount0Increased, _amount1Increased]
-    );
   }
 
   function _decreaseLiquidity(
@@ -438,12 +423,6 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     lpToken.burn(_account, uint256(_liquidity));
     (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
     _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
-
-    logr(
-      '_decreaseLiquidity()',
-      ['_expectedAmount0', '_expectedAmount1', 'amount0Min', 'amount1Min', 'amount0Decreased', 'amount1Decreased'],
-      [uint256(_expectedAmount0), _expectedAmount1, amount0Min, amount1Min, _amount0Decreased, _amount1Decreased]
-    );
   }
 
   function _collect(
@@ -519,12 +498,6 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
       amount1 = amount1.sub(diff);
       amount0 = amount0.add(_swap(token1, diff, _slippage));
     }
-
-    logr(
-      '_convertToRatio()',
-      ['targetAmount0', 'targetAmount1', 'amount0', 'amount1', '0', '0'],
-      [uint256(targetAmount0), targetAmount1, amount0, amount1, 0, 0]
-    );
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);
     assert(ERC20(token1).balanceOf(address(this)) >= amount1);
