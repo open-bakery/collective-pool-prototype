@@ -29,6 +29,7 @@ import '../src/PoolFactory.sol';
 import '../src/libraries/Conversions.sol';
 import '../src/SDCA.sol';
 import '../src/DepositRatioCalculator.sol';
+import '../src/logs/Logs.sol';
 
 contract UniswapTest is Test, IERC721Receiver {
   using PositionValue for NonfungiblePositionManager;
@@ -58,6 +59,7 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   mapping(uint256 => Deposit) deposits;
+  Logs info = new Logs();
 
   function setUp() public {}
 
@@ -67,6 +69,7 @@ contract UniswapTest is Test, IERC721Receiver {
   }
 
   function testMainnet() public {
+    // info.logr('This is the header', ['param1', '0', '0', '0', '0'], [uint256(1), 0, 0, 0, 0]);
     // DepositRatioCalculator drc = new DepositRatioCalculator();
     // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
     testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
@@ -134,6 +137,7 @@ contract UniswapTest is Test, IERC721Receiver {
 
     if (test == 0) testLiquidityProvisionAndNFTClaim(rangePool, amount0, amount1);
     if (test == 1) testAutoCompound(rangePool, amount0 * 100, amount1 * 100);
+    if (test == 2) testCalculateDepositRatio(rangePool, amount0, amount1);
   }
 
   function testSwapFromDCA(
@@ -201,6 +205,20 @@ contract UniswapTest is Test, IERC721Receiver {
     rangePool.claimNFT();
     assertTrue(NFPM.ownerOf(rangePool.tokenId()) == address(this));
     assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == 0);
+  }
+
+  function testCalculateDepositRatio(
+    RangePool rangePool,
+    uint256 amount0,
+    uint256 amount1
+  ) public {
+    uint16 slippage = 5_00;
+
+    deal(rangePool.token0(), address(this), amount0);
+    deal(rangePool.token1(), address(this), amount1);
+
+    rangePool.addLiquidity(amount0, amount1, slippage);
+    rangePool.calculateDepositRatio(amount0 / 2, amount1 / 2);
   }
 
   function performSwaps(

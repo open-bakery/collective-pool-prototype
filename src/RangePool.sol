@@ -31,6 +31,8 @@ import './libraries/PoolUtils.sol';
 import './libraries/Math.sol';
 import './LP.sol';
 
+import './logs/Logs.sol';
+
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
 contract RangePool is IERC721Receiver, Test, Ownable {
@@ -41,6 +43,8 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   using SafeERC20 for ERC20;
   using RatioCalculator for uint160;
   using SafeMath for uint256;
+
+  Logs info = new Logs();
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -118,9 +122,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     id;
     data;
 
-    console.log('-----------------------------');
-    console.log('onERC721Received() Function Call');
-    console.log('-----------------------------');
+    info.logr('onERC721Received()', ['0', '0', '0', '0', '0', '0'], [uint256(0), 0, 0, 0, 0, 0]);
 
     return this.onERC721Received.selector;
   }
@@ -224,11 +226,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       resolution
     );
 
-    console.log('----------------------------------');
-    console.log('calculateDepositRatio()');
-    console.log('amount0Ratioed: ', amount0Ratioed);
-    console.log('amount1Ratioed: ', amount1Ratioed);
-    console.log('----------------------------------');
+    info.logr(
+      'calculateDepositRatio()',
+      ['amount0Ratioed', 'amount0Ratioed', '0', '0', '0', '0'],
+      [uint256(amount0Ratioed), amount1Ratioed, 0, 0, 0, 0]
+    );
   }
 
   function claimNFT() external onlyOwner {
@@ -337,12 +339,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     _amountOut = router.exactInputSingle(params);
 
-    console.log('-----------------------------');
-    console.log('_swap() Function Call');
-    console.log('expectedAmountOut: ', expectedAmountOut);
-    console.log('amountOutMinimum: ', amountOutMinimum);
-    console.log('_amountOut: ', _amountOut);
-    console.log('-----------------------------');
+    info.logr(
+      '_swap()',
+      ['expectedAmountOut', 'amountOutMinimum', '_amountOut', '0', '0', '0'],
+      [uint256(expectedAmountOut), amountOutMinimum, _amountOut, 0, 0, 0]
+    );
   }
 
   function _addLiquidity(
@@ -476,15 +477,25 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
 
-    console.log('-----------------------------');
-    console.log('_increaseLiquidity() Function Call');
-    console.log('_amount0: ', _amount0);
-    console.log('_amount1: ', _amount1);
-    console.log('amount0MinAccepted: ', amount0MinAccepted);
-    console.log('amount1MinAccepted: ', amount1MinAccepted);
-    console.log('_amount0Increased: ', _amount0Increased);
-    console.log('_amount1Increased: ', _amount1Increased);
-    console.log('-----------------------------');
+    info.logr(
+      '_increaseLiquidity()',
+      [
+        '_amount0',
+        '_amount1',
+        'amount0MinAccepted',
+        'amount1MinAccepted',
+        '_amount0Increased',
+        '_amount1Increased'
+      ],
+      [
+        uint256(_amount0),
+        _amount1,
+        amount0MinAccepted,
+        amount1MinAccepted,
+        _amount0Increased,
+        _amount1Increased
+      ]
+    );
   }
 
   function _decreaseLiquidity(
@@ -527,15 +538,25 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
     _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
 
-    console.log('-----------------------------');
-    console.log('_decreaseLiquidity() Function Call');
-    console.log('_expectedAmount0: ', _expectedAmount0);
-    console.log('_expectedAmount1: ', _expectedAmount1);
-    console.log('amount0Min: ', amount0Min);
-    console.log('amount1Min: ', amount1Min);
-    console.log('amount0Decreased: ', _amount0Decreased);
-    console.log('amount1Decreased: ', _amount1Decreased);
-    console.log('-----------------------------');
+    info.logr(
+      '_decreaseLiquidity()',
+      [
+        '_expectedAmount0',
+        '_expectedAmount1',
+        'amount0Min',
+        'amount1Min',
+        'amount0Decreased',
+        'amount1Decreased'
+      ],
+      [
+        uint256(_expectedAmount0),
+        _expectedAmount1,
+        amount0Min,
+        amount1Min,
+        _amount0Decreased,
+        _amount1Decreased
+      ]
+    );
   }
 
   function _collect(
@@ -620,15 +641,11 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       amount0 = amount0.add(_swap(token1, diff, _slippage));
     }
 
-    console.log('-----------------------------');
-    console.log('_convertToRatio() Function Call');
-    console.log('targetAmount0: ', targetAmount0);
-    console.log('targetAmount1: ', targetAmount1);
-    console.log('token0.balanceOf(address(this)): ', ERC20(token0).balanceOf(address(this)));
-    console.log('amount0: ', amount0);
-    console.log('token1.balanceOf(address(this)) ', ERC20(token1).balanceOf(address(this)));
-    console.log('amount1: ', amount1);
-    console.log('-----------------------------');
+    info.logr(
+      '_convertToRatio()',
+      ['targetAmount0', 'targetAmount1', 'amount0', 'amount1', '0', '0'],
+      [uint256(targetAmount0), targetAmount1, amount0, amount1, 0, 0]
+    );
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);
     assert(ERC20(token1).balanceOf(address(this)) >= amount1);
