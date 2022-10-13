@@ -35,7 +35,7 @@ import './logs/Logs.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
-contract RangePool is IERC721Receiver, Test, Ownable {
+contract RangePool is IERC721Receiver, Test, Logs, Ownable {
   using PositionValue for NonfungiblePositionManager;
   using PoolUtils for IUniswapV3Pool;
   using TransferHelper for address;
@@ -43,8 +43,6 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   using SafeERC20 for ERC20;
   using RatioCalculator for uint160;
   using SafeMath for uint256;
-
-  Logs info = new Logs();
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -122,7 +120,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     id;
     data;
 
-    info.logr('onERC721Received()', ['0', '0', '0', '0', '0', '0'], [uint256(0), 0, 0, 0, 0, 0]);
+    logr('onERC721Received()', ['0', '0', '0', '0', '0', '0'], [uint256(0), 0, 0, 0, 0, 0]);
 
     return this.onERC721Received.selector;
   }
@@ -214,9 +212,9 @@ contract RangePool is IERC721Receiver, Test, Ownable {
   function calculateDepositRatio(uint256 amount0, uint256 amount1)
     external
     view
-    returns (uint256 amount0Ratioed, uint256 amount1Ratioed)
+    returns (uint256 amountRatioed0, uint256 amountRatioed1)
   {
-    (amount0Ratioed, amount1Ratioed) = pool.sqrtPriceX96().calculateRatio(
+    (amountRatioed0, amountRatioed1) = pool.sqrtPriceX96().calculateRatio(
       pool.liquidity(),
       amount0,
       amount1,
@@ -224,12 +222,6 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       upperTick,
       ERC20(token0).decimals(),
       resolution
-    );
-
-    info.logr(
-      'calculateDepositRatio()',
-      ['amount0Ratioed', 'amount0Ratioed', '0', '0', '0', '0'],
-      [uint256(amount0Ratioed), amount1Ratioed, 0, 0, 0, 0]
     );
   }
 
@@ -247,13 +239,13 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     onlyOwner
     returns (
       uint128 liquidityAdded,
-      uint256 amount0Received,
-      uint256 amount1Received
+      uint256 amount0Added,
+      uint256 amount1Added
     )
   {
     ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
-    (liquidityAdded, amount0Received, amount1Received) = _addLiquidity(
+    (liquidityAdded, amount0Added, amount1Added) = _addLiquidity(
       msg.sender,
       amount0,
       amount1,
@@ -339,7 +331,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     _amountOut = router.exactInputSingle(params);
 
-    info.logr(
+    logr(
       '_swap()',
       ['expectedAmountOut', 'amountOutMinimum', '_amountOut', '0', '0', '0'],
       [uint256(expectedAmountOut), amountOutMinimum, _amountOut, 0, 0, 0]
@@ -477,7 +469,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
 
-    info.logr(
+    logr(
       '_increaseLiquidity()',
       [
         '_amount0',
@@ -538,7 +530,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
     (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
     _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
 
-    info.logr(
+    logr(
       '_decreaseLiquidity()',
       [
         '_expectedAmount0',
@@ -641,7 +633,7 @@ contract RangePool is IERC721Receiver, Test, Ownable {
       amount0 = amount0.add(_swap(token1, diff, _slippage));
     }
 
-    info.logr(
+    logr(
       '_convertToRatio()',
       ['targetAmount0', 'targetAmount1', 'amount0', 'amount1', '0', '0'],
       [uint256(targetAmount0), targetAmount1, amount0, amount1, 0, 0]

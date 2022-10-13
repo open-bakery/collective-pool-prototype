@@ -9,7 +9,7 @@ contract Logs is Test {
     string memory header,
     string[6] memory params,
     uint256[6] memory nums
-  ) external view {
+  ) internal view {
     string memory printParam;
     _limit();
     console.log(header);

@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import 'forge-std/Test.sol';
 
-contract ContractTest is Test {
+contract GasTest is Test {
   function setUp() public {}
 
   function testExample() public {
