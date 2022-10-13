@@ -8,10 +8,10 @@ trace:; forge test -vv
 
 testLocal:; forge test -vvv --match-test testAnvil*
 
-testMain:; forge test -vvv --match-test testMainnet* --fork-url $(FORK_RPC_URL)
+testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
 
 testArb:; forge test -vvv --mt testArbitrum*  --fork-url $(ARBITRUM_RPC_ALCHEMY)
 
-testPool:; forge test -vv --mc PoolTest --fork-url $(ARBITRUM_RPC_ALCHEMY)
+testLogs:; forge test -vvv --mc LogsTest* --fork-url $(FORK_RPC_URL)
 
-testGas:; forge test --vv --mc GasTest --gas-report --fork-url $(ARBITRUM_RPC_ALCHEMY)
+testGas:; forge test -vv --mc GasTest --gas-report --fork-url $(ARBITRUM_RPC_ALCHEMY)

@@ -114,8 +114,7 @@ contract UnitTest is Test, LocalVars, Logs, IERC721Receiver {
     );
 
     assertTrue(
-      ERC20(rangePool.lpToken()).balanceOf(address(this)) ==
-        uint256(liquidityAdded).add(initialBalancelpToken)
+      ERC20(rangePool.lpToken()).balanceOf(address(this)) == uint256(liquidityAdded).add(initialBalancelpToken)
     );
     assertTrue(liquidityAdded > 0);
   }
@@ -267,9 +266,7 @@ contract UnitTest is Test, LocalVars, Logs, IERC721Receiver {
     IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(tokenIn, tokenOut, fee));
     (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
-    uint160 limit = pool.token0() == tokenIn
-      ? sqrtPriceX96 - sqrtPriceX96 / 10
-      : sqrtPriceX96 + sqrtPriceX96 / 10;
+    uint160 limit = pool.token0() == tokenIn ? sqrtPriceX96 - sqrtPriceX96 / 10 : sqrtPriceX96 + sqrtPriceX96 / 10;
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: tokenIn,

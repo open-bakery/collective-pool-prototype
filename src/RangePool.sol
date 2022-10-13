@@ -86,16 +86,8 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     (token0, token1) = (pool.token0(), pool.token1());
 
     if (_tokenA != token0) {
-      _lowerLimitInTokenB = Utils.priceToken0(
-        _lowerLimitInTokenB,
-        ERC20(token0).decimals(),
-        ERC20(token1).decimals()
-      );
-      _upperLimitInTokenB = Utils.priceToken0(
-        _upperLimitInTokenB,
-        ERC20(token0).decimals(),
-        ERC20(token1).decimals()
-      );
+      _lowerLimitInTokenB = Utils.priceToken0(_lowerLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
+      _upperLimitInTokenB = Utils.priceToken0(_upperLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
     }
 
     fee = _fee;
@@ -147,24 +139,12 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
 
   function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
     priceToken1 = pool.uintPrice();
-    priceToken0 = Utils.priceToken0(
-      priceToken1,
-      ERC20(token0).decimals(),
-      ERC20(token1).decimals()
-    );
+    priceToken0 = Utils.priceToken0(priceToken1, ERC20(token0).decimals(), ERC20(token1).decimals());
   }
 
-  function oraclePrices(uint32 secondsElapsed)
-    external
-    view
-    returns (uint256 priceToken0, uint256 priceToken1)
-  {
+  function oraclePrices(uint32 secondsElapsed) external view returns (uint256 priceToken0, uint256 priceToken1) {
     priceToken1 = pool.oracleUintPrice(secondsElapsed);
-    priceToken0 = Utils.priceToken0(
-      priceToken1,
-      ERC20(token0).decimals(),
-      ERC20(token1).decimals()
-    );
+    priceToken0 = Utils.priceToken0(priceToken1, ERC20(token0).decimals(), ERC20(token1).decimals());
   }
 
   function lowerLimit() external view returns (uint256) {
@@ -245,12 +225,7 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
   {
     ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
-    (liquidityAdded, amount0Added, amount1Added) = _addLiquidity(
-      msg.sender,
-      amount0,
-      amount1,
-      slippage
-    );
+    (liquidityAdded, amount0Added, amount1Added) = _addLiquidity(msg.sender, amount0, amount1, slippage);
   }
 
   function decreaseLiquidity(uint128 liquidity, uint16 slippage)
@@ -273,10 +248,7 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     (addedLiquidity, amountCompounded0, amountCompounded1) = _compound(msg.sender, slippage);
   }
 
-  function updateRange(uint256 lowerLimit, uint256 upperLimit)
-    external
-    returns (uint256 amount0, uint256 amount1)
-  {
+  function updateRange(uint256 lowerLimit, uint256 upperLimit) external returns (uint256 amount0, uint256 amount1) {
     // Claim tokens from liquidity
     // Update Pool Range
     // AddLiquidity
@@ -287,10 +259,7 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     uint256 _amountIn,
     uint16 _slippage
   ) internal returns (uint256 _amountOut) {
-    require(
-      _tokenIn == token0 || _tokenIn == token1,
-      'RangePool: Only tokens from the pool are supported for swap'
-    );
+    require(_tokenIn == token0 || _tokenIn == token1, 'RangePool: Only tokens from the pool are supported for swap');
 
     address tokenOut;
     _tokenIn == token0 ? tokenOut = token1 : tokenOut = token0;
@@ -298,25 +267,13 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
 
     uint256 expectedAmountOut = tokenOut == token0
       ? pool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(_amountIn, ERC20(token0).decimals())
-      : pool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(
-        _amountIn,
-        ERC20(token0).decimals()
-      );
+      : pool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(_amountIn, ERC20(token0).decimals());
 
-    uint256 amountOutMinimum = Utils.applySlippageTolerance(
-      false,
-      expectedAmountOut,
-      _slippage,
-      resolution
-    );
+    uint256 amountOutMinimum = Utils.applySlippageTolerance(false, expectedAmountOut, _slippage, resolution);
 
     uint160 sqrtPriceLimitX96 = _tokenIn == token1
-      ? uint160(
-        Utils.applySlippageTolerance(true, uint256(pool.sqrtPriceX96()), _slippage, resolution)
-      )
-      : uint160(
-        Utils.applySlippageTolerance(false, uint256(pool.sqrtPriceX96()), _slippage, resolution)
-      );
+      ? uint160(Utils.applySlippageTolerance(true, uint256(pool.sqrtPriceX96()), _slippage, resolution))
+      : uint160(Utils.applySlippageTolerance(false, uint256(pool.sqrtPriceX96()), _slippage, resolution));
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: _tokenIn,
@@ -351,11 +308,7 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
       uint256 _amount1Added
     )
   {
-    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(
-      _amount0,
-      _amount1,
-      _slippage
-    );
+    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(_amount0, _amount1, _slippage);
 
     if (tokenId == 0) {
       (tokenId, _liquidityAdded, _amount0Added, _amount1Added) = _mint(
@@ -396,18 +349,8 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     token0.safeApprove(address(NFPM), type(uint256).max);
     token1.safeApprove(address(NFPM), type(uint256).max);
 
-    uint256 amount0MinAccepted = Utils.applySlippageTolerance(
-      false,
-      _amount0,
-      _slippage,
-      resolution
-    );
-    uint256 amount1MinAccepted = Utils.applySlippageTolerance(
-      false,
-      _amount1,
-      _slippage,
-      resolution
-    );
+    uint256 amount0MinAccepted = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
+    uint256 amount1MinAccepted = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
 
     INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
       token0: token0,
@@ -442,18 +385,8 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
       uint256 _amount1Increased
     )
   {
-    uint256 amount0MinAccepted = Utils.applySlippageTolerance(
-      false,
-      _amount0,
-      _slippage,
-      resolution
-    );
-    uint256 amount1MinAccepted = Utils.applySlippageTolerance(
-      false,
-      _amount1,
-      _slippage,
-      resolution
-    );
+    uint256 amount0MinAccepted = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
+    uint256 amount1MinAccepted = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
 
     INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
       .IncreaseLiquidityParams({
@@ -471,22 +404,8 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
 
     logr(
       '_increaseLiquidity()',
-      [
-        '_amount0',
-        '_amount1',
-        'amount0MinAccepted',
-        'amount1MinAccepted',
-        '_amount0Increased',
-        '_amount1Increased'
-      ],
-      [
-        uint256(_amount0),
-        _amount1,
-        amount0MinAccepted,
-        amount1MinAccepted,
-        _amount0Increased,
-        _amount1Increased
-      ]
+      ['_amount0', '_amount1', 'amount0MinAccepted', 'amount1MinAccepted', '_amount0Increased', '_amount1Increased'],
+      [uint256(_amount0), _amount1, amount0MinAccepted, amount1MinAccepted, _amount0Increased, _amount1Increased]
     );
   }
 
@@ -504,18 +423,8 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
       _liquidity
     );
 
-    uint256 amount0Min = Utils.applySlippageTolerance(
-      false,
-      _expectedAmount0,
-      _slippage,
-      resolution
-    );
-    uint256 amount1Min = Utils.applySlippageTolerance(
-      false,
-      _expectedAmount1,
-      _slippage,
-      resolution
-    );
+    uint256 amount0Min = Utils.applySlippageTolerance(false, _expectedAmount0, _slippage, resolution);
+    uint256 amount1Min = Utils.applySlippageTolerance(false, _expectedAmount1, _slippage, resolution);
 
     INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager
       .DecreaseLiquidityParams({
@@ -532,22 +441,8 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
 
     logr(
       '_decreaseLiquidity()',
-      [
-        '_expectedAmount0',
-        '_expectedAmount1',
-        'amount0Min',
-        'amount1Min',
-        'amount0Decreased',
-        'amount1Decreased'
-      ],
-      [
-        uint256(_expectedAmount0),
-        _expectedAmount1,
-        amount0Min,
-        amount1Min,
-        _amount0Decreased,
-        _amount1Decreased
-      ]
+      ['_expectedAmount0', '_expectedAmount1', 'amount0Min', 'amount1Min', 'amount0Decreased', 'amount1Decreased'],
+      [uint256(_expectedAmount0), _expectedAmount1, amount0Min, amount1Min, _amount0Decreased, _amount1Decreased]
     );
   }
 
@@ -556,27 +451,19 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
     uint128 _amount0,
     uint128 _amount1
   ) internal returns (uint256 amount0Collected, uint256 amount1Collected) {
-    INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager
-      .CollectParams({
-        tokenId: tokenId,
-        recipient: _recipient,
-        amount0Max: _amount0,
-        amount1Max: _amount1
-      });
+    INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
+      tokenId: tokenId,
+      recipient: _recipient,
+      amount0Max: _amount0,
+      amount1Max: _amount1
+    });
 
     (amount0Collected, amount1Collected) = NFPM.collect(params);
   }
 
-  function _collectFees(address _recipient)
-    internal
-    returns (uint256 amount0Collected, uint256 amount1Collected)
-  {
+  function _collectFees(address _recipient) internal returns (uint256 amount0Collected, uint256 amount1Collected) {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
-    (amount0Collected, amount1Collected) = _collect(
-      _recipient,
-      uint128(feeAmount0),
-      uint128(feeAmount1)
-    );
+    (amount0Collected, amount1Collected) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
 
     totalClaimedFees0 = totalClaimedFees0.add(amount0Collected);
     totalClaimedFees1 = totalClaimedFees1.add(amount1Collected);
@@ -644,11 +531,7 @@ contract RangePool is IERC721Receiver, Test, Logs, Ownable {
   }
 
   function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price0) {
-    _price0 = Utils.priceToken0(
-      _getAveragePriceAtUpperLimit(),
-      ERC20(token0).decimals(),
-      ERC20(token1).decimals()
-    );
+    _price0 = Utils.priceToken0(_getAveragePriceAtUpperLimit(), ERC20(token0).decimals(), ERC20(token1).decimals());
   }
 
   function _getAveragePriceAtUpperLimit() internal view returns (uint256 _price1) {
