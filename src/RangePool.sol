@@ -73,31 +73,11 @@ contract RangePool is IERC721Receiver, Ownable {
     uint256 _lowerLimitInTokenB,
     uint256 _upperLimitInTokenB
   ) {
-    require(_lowerLimitInTokenB != _upperLimitInTokenB, 'RangePool: Limits must be within a range');
-
-    (_lowerLimitInTokenB, _upperLimitInTokenB) = (_lowerLimitInTokenB < _upperLimitInTokenB)
-      ? (_lowerLimitInTokenB, _upperLimitInTokenB)
-      : (_upperLimitInTokenB, _lowerLimitInTokenB);
-
-    if (_lowerLimitInTokenB == 0) _lowerLimitInTokenB = 1;
-
-    pool = IUniswapV3Pool(IUniswapV3Factory(uniswapFactory).getPool(_tokenA, _tokenB, _fee));
-    (token0, token1) = (pool.token0(), pool.token1());
-
-    if (_tokenA != token0) {
-      _lowerLimitInTokenB = Utils.priceToken0(_lowerLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
-      _upperLimitInTokenB = Utils.priceToken0(_upperLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
-    }
-
+    pool = IUniswapV3Pool(Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory));
+    (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
     fee = _fee;
     tickSpacing = pool.tickSpacing();
-
-    (lowerTick, upperTick) = Utils.convertLimitsToTicks(
-      _lowerLimitInTokenB,
-      _upperLimitInTokenB,
-      tickSpacing,
-      ERC20(token0).decimals()
-    );
+    (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, _tokenB, _lowerLimitInTokenB, _upperLimitInTokenB);
   }
 
   function onERC721Received(
@@ -231,6 +211,7 @@ contract RangePool is IERC721Receiver, Ownable {
     returns (uint256 amount0Decreased, uint256 amount1Decreased)
   {
     (amount0Decreased, amount1Decreased) = _decreaseLiquidity(msg.sender, liquidity, slippage);
+    _collect(msg.sender, uint128(amount0Decreased), uint128(amount1Decreased));
   }
 
   function compound(uint16 slippage)
@@ -245,10 +226,37 @@ contract RangePool is IERC721Receiver, Ownable {
     (addedLiquidity, amountCompounded0, amountCompounded1) = _compound(msg.sender, slippage);
   }
 
-  function updateRange(uint256 lowerLimit, uint256 upperLimit) external returns (uint256 amount0, uint256 amount1) {
-    // Claim tokens from liquidity
-    // Update Pool Range
-    // AddLiquidity
+  function updateRange(
+    address tokenA,
+    uint256 lowerLimitA,
+    uint256 upperLimitA,
+    uint16 slippage
+  )
+    external
+    returns (
+      uint128 addedLiquidity,
+      uint256 addedAmount0,
+      uint256 addedAmount1
+    )
+  {
+    (uint256 amount0Decreased, uint256 amount1Decreased) = _decreaseLiquidity(
+      msg.sender,
+      uint128(ERC20(lpToken).balanceOf(msg.sender)),
+      slippage
+    );
+    (uint256 collected0, uint256 collected1) = _collect(
+      address(this),
+      uint128(amount0Decreased),
+      uint128(amount1Decreased)
+    );
+    (uint256 feesCollected0, uint256 feesCollected1) = _collectFees(address(this));
+
+    collected0 = collected0.add(feesCollected0);
+    collected1 = collected1.add(feesCollected1);
+
+    (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, tokenA, lowerLimitA, upperLimitA);
+
+    (addedLiquidity, addedAmount0, addedAmount1) = _addLiquidity(msg.sender, collected0, collected1, slippage);
   }
 
   function _swap(
@@ -422,7 +430,6 @@ contract RangePool is IERC721Receiver, Ownable {
 
     lpToken.burn(_account, uint256(_liquidity));
     (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
-    _collect(_account, uint128(_amount0Decreased), uint128(_amount1Decreased));
   }
 
   function _collect(

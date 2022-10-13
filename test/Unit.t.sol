@@ -12,8 +12,9 @@ import '../src/RangePool.sol';
 import '../src/DepositRatioCalculator.sol';
 import '../src/logs/Logs.sol';
 import './LocalVars.t.sol';
+import './Logs.t.sol';
 
-contract UnitTest is Test, LocalVars, Logs, IERC721Receiver {
+contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using PositionValue for NonfungiblePositionManager;
   using TransferHelper for address;
   using stdStorage for StdStorage;
@@ -33,12 +34,13 @@ contract UnitTest is Test, LocalVars, Logs, IERC721Receiver {
   }
 
   function testMainnet() public {
-    addLiquidity(20_000_000000, 5 ether, 1_00);
-    increaseLiquidity(4_000_000000, 1 ether, 1_00);
+    // addLiquidity(20_000_000000, 5 ether, 1_00);
+    // increaseLiquidity(4_000_000000, 1 ether, 1_00);
+
     // DepositRatioCalculator drc = new DepositRatioCalculator();
     // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
     // testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
-    // testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
+    testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     // testPoolConstruct(MAIN_USDC, MAIN_WETH, 500, 1000000000000000, 500000000000000);
     // testSwapFromDCA(MAIN_APE, MAIN_WETH, 3000, 64_000 ether, 5_00);
   }
@@ -65,6 +67,8 @@ contract UnitTest is Test, LocalVars, Logs, IERC721Receiver {
     uint256 upperLimitInTokenB
   ) public returns (RangePool rangePool) {
     rangePool = new RangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
+    logLimits(rangePool);
+    console.log(rangePool.token0());
   }
 
   function addLiquidity(

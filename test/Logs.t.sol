@@ -3,42 +3,27 @@ pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
 import '../src/RangePool.sol';
-import './LocalVars.t.sol';
 import '../src/logs/Logs.sol';
 
-contract LogsTest is Test, LocalVars, Logs {
-  RangePool public rangePool;
-
-  constructor() {
-    rangePool = new RangePool(MAIN_USDC, MAIN_WETH, 500, 0.001 ether, 0.0005 ether);
+contract LogsTest is Test, Logs {
+  function logPrincipal(RangePool rangePool) public view {
+    (uint256 amount0, uint256 amount1) = rangePool.principal();
+    logr('logPrincipal()', ['amount0', 'amount1', '0', '0', '0', '0'], [uint256(amount0), amount1, 0, 0, 0, 0]);
   }
 
-  function setUp() public {}
-
-  function testLogsFull() public {
-    uint256 amount0 = 20_000;
-    uint256 amount1 = 5 ether;
-    ERC20(rangePool.token0()).approve(address(rangePool), type(uint256).max);
-    ERC20(rangePool.token1()).approve(address(rangePool), type(uint256).max);
-    deal(rangePool.token0(), address(this), amount0);
-    deal(rangePool.token1(), address(this), amount1);
-    rangePool.addLiquidity(amount0, amount1, 1_00);
-
-    logAveragePrices();
-    logLimits();
-    logTokenAmountsAtLimits();
-    logPrices();
-    logOraclePrices(60);
+  function logUnclaimedFees(RangePool rangePool) public view {
+    (uint256 amount0, uint256 amount1) = rangePool.unclaimedFees();
+    logr('logUnclaimedFees()', ['amount0', 'amount1', '0', '0', '0', '0'], [uint256(amount0), amount1, 0, 0, 0, 0]);
   }
 
-  function logAveragePrices() public view {
+  function logAveragePrices(RangePool rangePool) public view {
     uint256 price0 = rangePool.averagePriceAtLowerLimit();
     uint256 price1 = rangePool.averagePriceAtUpperLimit();
 
     logr('logAveragePrices()', ['price0', 'price1', '0', '0', '0', '0'], [uint256(price0), price1, 0, 0, 0, 0]);
   }
 
-  function logTokenAmountsAtLimits() public view {
+  function logTokenAmountsAtLimits(RangePool rangePool) public view {
     (uint256 lowerAmount0, uint256 lowerAmount1) = rangePool.tokenAmountsAtLowerLimit();
     (uint256 upperAmount0, uint256 upperAmount1) = rangePool.tokenAmountsAtUpperLimit();
 
@@ -49,7 +34,11 @@ contract LogsTest is Test, LocalVars, Logs {
     );
   }
 
-  function logRatios(uint256 amount0, uint256 amount1) public view {
+  function logRatios(
+    RangePool rangePool,
+    uint256 amount0,
+    uint256 amount1
+  ) public view {
     (uint256 amountRatioed0, uint256 amountRatioed1) = rangePool.calculateDepositRatio(amount0, amount1);
 
     logr(
@@ -59,19 +48,19 @@ contract LogsTest is Test, LocalVars, Logs {
     );
   }
 
-  function logPrices() public view {
+  function logPrices(RangePool rangePool) public view {
     (uint256 price0, uint256 price1) = rangePool.prices();
 
     logr('logPrices()', ['price0', 'price1', '0', '0', '0', '0'], [uint256(price0), price1, 0, 0, 0, 0]);
   }
 
-  function logOraclePrices(uint32 _seconds) public view {
+  function logOraclePrices(RangePool rangePool, uint32 _seconds) public view {
     (uint256 price0, uint256 price1) = rangePool.oraclePrices(_seconds);
 
     logr('logOraclePrices()', ['price0', 'price1', '0', '0', '0', '0'], [uint256(price0), price1, 0, 0, 0, 0]);
   }
 
-  function logLimits() public view {
+  function logLimits(RangePool rangePool) public view {
     uint256 lowerLimit = rangePool.lowerLimit();
     uint256 upperLimit = rangePool.upperLimit();
 

@@ -25,11 +25,7 @@ library Utils {
     return PoolAddress.computeAddress(uniswapFactory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
   }
 
-  function orderTokens(address tokenA, address tokenB)
-    internal
-    pure
-    returns (address token0, address token1)
-  {
+  function orderTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
     require(tokenA != tokenB);
     (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
   }
@@ -43,11 +39,7 @@ library Utils {
     return (10**(SafeMath.add(decimalsToken0, decimalsToken1))).div(priceToken1);
   }
 
-  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0)
-    internal
-    pure
-    returns (uint256)
-  {
+  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0) internal pure returns (uint256) {
     return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
   }
 
@@ -82,6 +74,31 @@ library Utils {
       : amount.sub(amount.mul(slippage).div(resolution));
   }
 
+  function validateAndConvertLimits(
+    IUniswapV3Pool pool,
+    address token,
+    uint256 lowerLimit,
+    uint256 upperLimit
+  ) internal returns (int24 lowerTick, int24 upperTick) {
+    require(lowerLimit != upperLimit, 'RangePool: Limits must be within a range');
+
+    (lowerLimit, upperLimit) = (lowerLimit < upperLimit) ? (lowerLimit, upperLimit) : (upperLimit, lowerLimit);
+
+    if (lowerLimit == 0) upperLimit = 1;
+
+    if (token != pool.token1()) {
+      lowerLimit = Utils.priceToken0(lowerLimit, ERC20(pool.token0()).decimals(), ERC20(pool.token1()).decimals());
+      upperLimit = Utils.priceToken0(upperLimit, ERC20(pool.token0()).decimals(), ERC20(pool.token1()).decimals());
+    }
+
+    (lowerTick, upperTick) = convertLimitsToTicks(
+      lowerLimit,
+      upperLimit,
+      pool.tickSpacing(),
+      ERC20(pool.token0()).decimals()
+    );
+  }
+
   function _getValidatedTickNumber(
     uint256 price,
     uint8 decimalsToken0,
@@ -96,11 +113,7 @@ library Utils {
     return (tick / tickSpacing) * tickSpacing;
   }
 
-  function _orderTicks(int24 tick0, int24 tick1)
-    private
-    pure
-    returns (int24 tickLower, int24 tickUpper)
-  {
+  function _orderTicks(int24 tick0, int24 tick1) private pure returns (int24 tickLower, int24 tickUpper) {
     (tickLower, tickUpper) = tick1 < tick0 ? (tick1, tick0) : (tick0, tick1);
   }
 }
