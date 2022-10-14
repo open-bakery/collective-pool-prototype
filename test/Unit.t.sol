@@ -56,16 +56,9 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     ERC20(token1).approve(address(rangePool), type(uint256).max);
   }
 
-  function testPoolConstruct(
-    address tokenA,
-    address tokenB,
-    uint24 fee,
-    uint256 lowerLimitInTokenB,
-    uint256 upperLimitInTokenB
-  ) public returns (RangePool rangePool) {
-    rangePool = new RangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
+  function testPoolConstruct() public {
+    rangePool = new RangePool(MAIN_USDC, MAIN_WETH, 500, 0.01 ether, 0.005 ether);
     logLimits(rangePool);
-    console.log(rangePool.token0());
   }
 
   function addLiquidity(
