@@ -222,8 +222,6 @@ contract RangePool is IERC721Receiver, Ownable {
   }
 
   function collectFees() external onlyOwner returns (uint256 amountCollected0, uint256 amountCollected1) {
-    (uint256 unclaimedFees0, uint256 unclaimedFees1) = unclaimedFees();
-    require((unclaimedFees0 + unclaimedFees1) > 0, 'RangePool: There are no unclaimed fees');
     (amountCollected0, amountCollected1) = _collectFees(msg.sender);
   }
 
@@ -462,8 +460,9 @@ contract RangePool is IERC721Receiver, Ownable {
 
   function _collectFees(address _recipient) internal returns (uint256 amountCollected0, uint256 amountCollected1) {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
-    (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
+    require((feeAmount0 + feeAmount1) > 0, 'RangePool: There are no fees to claim');
 
+    (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
     totalClaimedFees0 = totalClaimedFees0.add(amountCollected0);
     totalClaimedFees1 = totalClaimedFees1.add(amountCollected1);
 
