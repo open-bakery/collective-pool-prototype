@@ -63,8 +63,9 @@ contract RangePool is IERC721Receiver, Ownable {
 
   uint16 constant resolution = 10_000;
 
-  event liquidityAdded(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
-  event liquidityRemoved(address indexed recipiend, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event LiquidityAdded(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event LiquidityRemoved(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
 
   constructor(
     address _tokenA,
@@ -98,7 +99,7 @@ contract RangePool is IERC721Receiver, Ownable {
     (amount0, amount1) = NFPM.principal(tokenId, pool.sqrtPriceX96());
   }
 
-  function unclaimedFees() external view returns (uint256 amount0, uint256 amount1) {
+  function unclaimedFees() public view returns (uint256 amount0, uint256 amount1) {
     (amount0, amount1) = NFPM.fees(tokenId);
   }
 
@@ -182,11 +183,6 @@ contract RangePool is IERC721Receiver, Ownable {
     );
   }
 
-  function claimNFT() external onlyOwner {
-    LP(lpToken).burn(msg.sender, LP(lpToken).balanceOf(msg.sender));
-    NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
-  }
-
   function addLiquidity(
     uint256 amount0,
     uint256 amount1,
@@ -219,6 +215,17 @@ contract RangePool is IERC721Receiver, Ownable {
     onlyOwner
     returns (uint256 amountRemoved0, uint256 amountRemoved1)
   {}
+
+  function claimNFT() external onlyOwner {
+    LP(lpToken).burn(msg.sender, LP(lpToken).balanceOf(msg.sender));
+    NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
+  }
+
+  function collectFees() external onlyOwner returns (uint256 amountCollected0, uint256 amountCollected1) {
+    (uint256 unclaimedFees0, uint256 unclaimedFees1) = unclaimedFees();
+    require((unclaimedFees0 + unclaimedFees1) > 0, 'RangePool: There are no unclaimed fees');
+    (amountCollected0, amountCollected1) = _collectFees(msg.sender);
+  }
 
   function compound(uint16 slippage)
     external
@@ -442,7 +449,7 @@ contract RangePool is IERC721Receiver, Ownable {
     address _recipient,
     uint128 _amount0,
     uint128 _amount1
-  ) internal returns (uint256 amount0Collected, uint256 amount1Collected) {
+  ) internal returns (uint256 amountCollected0, uint256 amountCollected1) {
     INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
       tokenId: tokenId,
       recipient: _recipient,
@@ -450,15 +457,17 @@ contract RangePool is IERC721Receiver, Ownable {
       amount1Max: _amount1
     });
 
-    (amount0Collected, amount1Collected) = NFPM.collect(params);
+    (amountCollected0, amountCollected1) = NFPM.collect(params);
   }
 
-  function _collectFees(address _recipient) internal returns (uint256 amount0Collected, uint256 amount1Collected) {
+  function _collectFees(address _recipient) internal returns (uint256 amountCollected0, uint256 amountCollected1) {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
-    (amount0Collected, amount1Collected) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
+    (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
 
-    totalClaimedFees0 = totalClaimedFees0.add(amount0Collected);
-    totalClaimedFees1 = totalClaimedFees1.add(amount1Collected);
+    totalClaimedFees0 = totalClaimedFees0.add(amountCollected0);
+    totalClaimedFees1 = totalClaimedFees1.add(amountCollected1);
+
+    emit FeesCollected(_recipient, amountCollected0, amountCollected1);
   }
 
   function _compound(address _recipient, uint16 _slippage)
