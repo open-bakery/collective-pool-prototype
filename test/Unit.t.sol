@@ -22,10 +22,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   RangePool public rangePool;
 
-  constructor() {
-    initialize(MAIN_USDC, MAIN_WETH, 500, 0.001 ether, 0.0005 ether);
-  }
-
   function setUp() public {}
 
   function testArbitrum() public {
@@ -34,9 +30,10 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function testMainnet() public {
+    initialize(MAIN_USDC, MAIN_WETH, 500, 0.001 ether, 0.0005 ether);
     addLiquidity(20_000_000000, 5 ether, 1_00);
     increaseLiquidity(4_000_000000, 1 ether, 1_00);
-
+    decreaseLiquidity(uint128(ERC20(rangePool.lpToken()).balanceOf(address(this)).div(2)), 1_00);
     // DepositRatioCalculator drc = new DepositRatioCalculator();
     // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
     // testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
@@ -136,13 +133,12 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       [uint256(amountDecreased0), amountDecreased1, 0, 0, 0, 0]
     );
 
-    assertTrue(
-      ERC20(rangePool.lpToken()).balanceOf(address(this)) ==
-        ERC20(rangePool.lpToken()).balanceOf(address(this)).sub(uint256(liquidity))
-    );
+    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == initialBalancelpToken.sub(uint256(liquidity)));
     assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == initialBalanceToken0.add(amountDecreased0));
-    assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == initialBalanceToken0.add(amountDecreased1));
+    assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == initialBalanceToken1.add(amountDecreased1));
   }
+
+  function claimFees() public {}
 
   //
   // function testCases(
