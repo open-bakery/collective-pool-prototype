@@ -140,8 +140,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       [uint256(amountCollected0), amountCollected1, 0, 0, 0, 0]
     );
 
-    assertTrue(amountCollected0 > 0);
-    assertTrue(amountCollected1 > 0);
     assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == ibToken0.add(amountCollected0));
     assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == ibToken1.add(amountCollected1));
   }

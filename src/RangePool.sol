@@ -63,8 +63,8 @@ contract RangePool is IERC721Receiver, Ownable {
 
   uint16 constant resolution = 10_000;
 
-  event LiquidityAdded(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
-  event LiquidityRemoved(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event LiquidityIncreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
 
   constructor(
@@ -214,7 +214,14 @@ contract RangePool is IERC721Receiver, Ownable {
     external
     onlyOwner
     returns (uint256 amountRemoved0, uint256 amountRemoved1)
-  {}
+  {
+    (amountRemoved0, amountRemoved1) = _decreaseLiquidity(
+      msg.sender,
+      uint128(ERC20(lpToken).balanceOf(msg.sender)),
+      slippage
+    );
+    _collect(msg.sender, uint128(amountRemoved0), uint128(amountRemoved1));
+  }
 
   function claimNFT() external onlyOwner {
     LP(lpToken).burn(msg.sender, LP(lpToken).balanceOf(msg.sender));
@@ -352,8 +359,8 @@ contract RangePool is IERC721Receiver, Ownable {
     returns (
       uint256 _generatedTokenId,
       uint128 _liquidityAdded,
-      uint256 _amountReceived0,
-      uint256 _amountReceived1
+      uint256 _amountAdded0,
+      uint256 _amountAdded1
     )
   {
     token0.safeApprove(address(NFPM), type(uint256).max);
@@ -376,10 +383,11 @@ contract RangePool is IERC721Receiver, Ownable {
       deadline: block.timestamp
     });
 
-    (_generatedTokenId, _liquidityAdded, _amountReceived0, _amountReceived1) = NFPM.mint(params);
+    (_generatedTokenId, _liquidityAdded, _amountAdded0, _amountAdded1) = NFPM.mint(params);
 
     if (address(lpToken) == address(0)) lpToken = new LP(_generatedTokenId);
     lpToken.mint(_account, _liquidityAdded);
+    emit LiquidityIncreased(_account, _amountAdded0, _amountAdded1, _liquidityAdded);
   }
 
   function _increaseLiquidity(
@@ -411,6 +419,7 @@ contract RangePool is IERC721Receiver, Ownable {
     (_liquidityIncreased, _amountIncreased0, _amountIncreased1) = NFPM.increaseLiquidity(params);
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
+    emit LiquidityIncreased(_recipient, _amountIncreased0, _amountIncreased1, _liquidityIncreased);
   }
 
   function _decreaseLiquidity(
@@ -460,7 +469,7 @@ contract RangePool is IERC721Receiver, Ownable {
 
   function _collectFees(address _recipient) internal returns (uint256 amountCollected0, uint256 amountCollected1) {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
-    require((feeAmount0 + feeAmount1) > 0, 'RangePool: There are no fees to claim');
+    if (feeAmount0.add(feeAmount1) == 0) return (amountCollected0, amountCollected1);
 
     (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
     totalClaimedFees0 = totalClaimedFees0.add(amountCollected0);
