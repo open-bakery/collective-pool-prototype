@@ -206,8 +206,12 @@ contract RangePool is IERC721Receiver, Ownable {
     onlyOwner
     returns (uint256 amountDecreased0, uint256 amountDecreased1)
   {
-    (amountDecreased0, amountDecreased1) = _decreaseLiquidity(msg.sender, liquidity, slippage);
-    _collect(msg.sender, uint128(amountDecreased0), uint128(amountDecreased1));
+    if (uint256(liquidity) == ERC20(lpToken).balanceOf(msg.sender)) {
+      (amountDecreased0, amountDecreased1) = _removeLiquidity(msg.sender, slippage);
+    } else {
+      (amountDecreased0, amountDecreased1) = _decreaseLiquidity(msg.sender, liquidity, slippage);
+      _collect(msg.sender, uint128(amountDecreased0), uint128(amountDecreased1));
+    }
   }
 
   function removeLiquidity(uint16 slippage)
@@ -215,12 +219,7 @@ contract RangePool is IERC721Receiver, Ownable {
     onlyOwner
     returns (uint256 amountRemoved0, uint256 amountRemoved1)
   {
-    (amountRemoved0, amountRemoved1) = _decreaseLiquidity(
-      msg.sender,
-      uint128(ERC20(lpToken).balanceOf(msg.sender)),
-      slippage
-    );
-    _collect(msg.sender, uint128(amountRemoved0), uint128(amountRemoved1));
+    (amountRemoved0, amountRemoved1) = _removeLiquidity(msg.sender, slippage);
   }
 
   function claimNFT() external onlyOwner {
@@ -257,23 +256,8 @@ contract RangePool is IERC721Receiver, Ownable {
       uint256 addedAmount1
     )
   {
-    (uint256 amountDecreased0, uint256 amountDecreased1) = _decreaseLiquidity(
-      msg.sender,
-      uint128(ERC20(lpToken).balanceOf(msg.sender)),
-      slippage
-    );
-    (uint256 collected0, uint256 collected1) = _collect(
-      address(this),
-      uint128(amountDecreased0),
-      uint128(amountDecreased1)
-    );
-    (uint256 feesCollected0, uint256 feesCollected1) = _collectFees(address(this));
-
-    collected0 = collected0.add(feesCollected0);
-    collected1 = collected1.add(feesCollected1);
-
     (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, tokenA, lowerLimitA, upperLimitA);
-
+    (uint256 collected0, uint256 collected1) = _removeLiquidity(msg.sender, slippage);
     (addedLiquidity, addedAmount0, addedAmount1) = _addLiquidity(msg.sender, collected0, collected1, slippage);
   }
 
@@ -452,6 +436,26 @@ contract RangePool is IERC721Receiver, Ownable {
     (_amountDecreased0, _amountDecreased1) = NFPM.decreaseLiquidity(params);
   }
 
+  function _removeLiquidity(address _account, uint16 _slippage)
+    internal
+    returns (uint256 amountRemoved0, uint256 amountRemoved1)
+  {
+    (uint256 amountRemoved0, uint256 amountRemoved1) = _decreaseLiquidity(
+      _account,
+      uint128(ERC20(lpToken).balanceOf(msg.sender)),
+      _slippage
+    );
+
+    (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
+
+    totalClaimedFees0 = totalClaimedFees0.add(feeAmount0);
+    totalClaimedFees1 = totalClaimedFees1.add(feeAmount1);
+
+    _collect(_account, uint128(amountRemoved0.add(feeAmount0)), uint128(amountRemoved1.add(feeAmount1)));
+
+    emit FeesCollected(_account, feeAmount0, feeAmount1);
+  }
+
   function _collect(
     address _recipient,
     uint128 _amount0,
@@ -471,11 +475,11 @@ contract RangePool is IERC721Receiver, Ownable {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
     if (feeAmount0.add(feeAmount1) == 0) return (amountCollected0, amountCollected1);
 
-    (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
+    (amountCollected0, amountCollected1) = _collect(msg.sender, uint128(feeAmount0), uint128(feeAmount1));
     totalClaimedFees0 = totalClaimedFees0.add(amountCollected0);
     totalClaimedFees1 = totalClaimedFees1.add(amountCollected1);
 
-    emit FeesCollected(_recipient, amountCollected0, amountCollected1);
+    emit FeesCollected(msg.sender, amountCollected0, amountCollected1);
   }
 
   function _compound(address _recipient, uint16 _slippage)
