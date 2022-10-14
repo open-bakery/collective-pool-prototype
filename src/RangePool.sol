@@ -250,6 +250,7 @@ contract RangePool is IERC721Receiver, Ownable {
     uint16 slippage
   )
     external
+    onlyOwner
     returns (
       uint128 addedLiquidity,
       uint256 addedAmount0,
@@ -262,31 +263,32 @@ contract RangePool is IERC721Receiver, Ownable {
   }
 
   function _swap(
+    address _recipient,
     address _tokenIn,
+    address _tokenOut,
+    uint24 _fee,
     uint256 _amountIn,
     uint16 _slippage
   ) internal returns (uint256 _amountOut) {
-    require(_tokenIn == token0 || _tokenIn == token1, 'RangePool: Only tokens from the pool are supported for swap');
+    IUniswapV3Pool swapPool = IUniswapV3Pool(IUniswapV3Factory(uniswapFactory).getPool(_tokenIn, _tokenOut, _fee));
 
-    address tokenOut;
-    _tokenIn == token0 ? tokenOut = token1 : tokenOut = token0;
     _tokenIn.safeApprove(address(router), _amountIn);
 
-    uint256 expectedAmountOut = tokenOut == token0
-      ? pool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(_amountIn, ERC20(token0).decimals())
-      : pool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(_amountIn, ERC20(token0).decimals());
+    uint256 expectedAmountOut = _tokenOut == swapPool.token0()
+      ? swapPool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(_amountIn, ERC20(swapPool.token0()).decimals())
+      : swapPool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(_amountIn, ERC20(swapPool.token0()).decimals());
 
     uint256 amountOutMinimum = Utils.applySlippageTolerance(false, expectedAmountOut, _slippage, resolution);
 
-    uint160 sqrtPriceLimitX96 = _tokenIn == token1
-      ? uint160(Utils.applySlippageTolerance(true, uint256(pool.sqrtPriceX96()), _slippage, resolution))
-      : uint160(Utils.applySlippageTolerance(false, uint256(pool.sqrtPriceX96()), _slippage, resolution));
+    uint160 sqrtPriceLimitX96 = _tokenIn == swapPool.token1()
+      ? uint160(Utils.applySlippageTolerance(true, uint256(swapPool.sqrtPriceX96()), _slippage, resolution))
+      : uint160(Utils.applySlippageTolerance(false, uint256(swapPool.sqrtPriceX96()), _slippage, resolution));
 
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: _tokenIn,
-      tokenOut: tokenOut,
-      fee: fee,
-      recipient: address(this),
+      tokenOut: _tokenOut,
+      fee: _fee,
+      recipient: _recipient,
       deadline: block.timestamp,
       amountIn: _amountIn,
       amountOutMinimum: amountOutMinimum,
@@ -309,7 +311,7 @@ contract RangePool is IERC721Receiver, Ownable {
       uint256 _amountAdded1
     )
   {
-    (uint256 amountRatioed0, uint256 amountRatioed1) = _convertToRatio(_amount0, _amount1, _slippage);
+    (uint256 amountRatioed0, uint256 amountRatioed1) = _convertToRatio(address(this), _amount0, _amount1, _slippage);
 
     if (tokenId == 0) {
       (tokenId, _liquidityAdded, _amountAdded0, _amountAdded1) = _mint(
@@ -503,6 +505,7 @@ contract RangePool is IERC721Receiver, Ownable {
   function _dca(address token) internal returns (uint256 amountAcquired) {}
 
   function _convertToRatio(
+    address _recipient,
     uint256 _amount0,
     uint256 _amount1,
     uint16 _slippage
@@ -524,13 +527,13 @@ contract RangePool is IERC721Receiver, Ownable {
     if (_amount0 > targetAmount0) {
       diff = _amount0.sub(targetAmount0);
       amount0 = amount0.sub(diff);
-      amount1 = amount1.add(_swap(token0, diff, _slippage));
+      amount1 = amount1.add(_swap(_recipient, token0, token1, fee, diff, _slippage));
     }
 
     if (_amount1 > targetAmount1) {
       diff = _amount1.sub(targetAmount1);
       amount1 = amount1.sub(diff);
-      amount0 = amount0.add(_swap(token1, diff, _slippage));
+      amount0 = amount0.add(_swap(_recipient, token1, token0, fee, diff, _slippage));
     }
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);

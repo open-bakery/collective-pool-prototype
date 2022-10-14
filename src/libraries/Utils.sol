@@ -26,7 +26,7 @@ library Utils {
   }
 
   function orderTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
-    require(tokenA != tokenB);
+    require(tokenA != tokenB, 'Utils: Equal tokens');
     (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
   }
 
