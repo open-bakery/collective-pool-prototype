@@ -34,13 +34,13 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function testMainnet() public {
-    // addLiquidity(20_000_000000, 5 ether, 1_00);
-    // increaseLiquidity(4_000_000000, 1 ether, 1_00);
+    addLiquidity(20_000_000000, 5 ether, 1_00);
+    increaseLiquidity(4_000_000000, 1 ether, 1_00);
 
     // DepositRatioCalculator drc = new DepositRatioCalculator();
     // drc.calculateDepositRatio(MAIN_WBTC, MAIN_WETH, 500, 3_0000_0000, 1 ether, 5 ether, 30 ether);
     // testCases(0, MAIN_WETH, 100 ether, MAIN_USDC, 20_000_000000, 500);
-    testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
+    // testPoolConstruct(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     // testPoolConstruct(MAIN_USDC, MAIN_WETH, 500, 1000000000000000, 500000000000000);
     // testSwapFromDCA(MAIN_APE, MAIN_WETH, 3000, 64_000 ether, 5_00);
   }
@@ -121,6 +121,27 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       ERC20(rangePool.lpToken()).balanceOf(address(this)) == uint256(liquidityAdded).add(initialBalancelpToken)
     );
     assertTrue(liquidityAdded > 0);
+  }
+
+  function decreaseLiquidity(uint128 liquidity, uint16 slippage) public {
+    uint256 initialBalancelpToken = ERC20(rangePool.lpToken()).balanceOf(address(this));
+    uint256 initialBalanceToken0 = ERC20(rangePool.token0()).balanceOf(address(this));
+    uint256 initialBalanceToken1 = ERC20(rangePool.token1()).balanceOf(address(this));
+
+    (uint256 amountDecreased0, uint256 amountDecreased1) = rangePool.decreaseLiquidity(liquidity, slippage);
+
+    logr(
+      'decreaseLiquidity()',
+      ['amountDecreased0', 'amountDecreased1', '0', '0', '0', '0'],
+      [uint256(amountDecreased0), amountDecreased1, 0, 0, 0, 0]
+    );
+
+    assertTrue(
+      ERC20(rangePool.lpToken()).balanceOf(address(this)) ==
+        ERC20(rangePool.lpToken()).balanceOf(address(this)).sub(uint256(liquidity))
+    );
+    assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == initialBalanceToken0.add(amountDecreased0));
+    assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == initialBalanceToken0.add(amountDecreased1));
   }
 
   //

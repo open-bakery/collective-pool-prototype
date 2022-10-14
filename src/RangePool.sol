@@ -196,23 +196,29 @@ contract RangePool is IERC721Receiver, Ownable {
     onlyOwner
     returns (
       uint128 liquidityAdded,
-      uint256 amount0Added,
-      uint256 amount1Added
+      uint256 amountAdded0,
+      uint256 amountAdded1
     )
   {
     ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
-    (liquidityAdded, amount0Added, amount1Added) = _addLiquidity(msg.sender, amount0, amount1, slippage);
+    (liquidityAdded, amountAdded0, amountAdded1) = _addLiquidity(msg.sender, amount0, amount1, slippage);
   }
 
   function decreaseLiquidity(uint128 liquidity, uint16 slippage)
     external
     onlyOwner
-    returns (uint256 amount0Decreased, uint256 amount1Decreased)
+    returns (uint256 amountDecreased0, uint256 amountDecreased1)
   {
-    (amount0Decreased, amount1Decreased) = _decreaseLiquidity(msg.sender, liquidity, slippage);
-    _collect(msg.sender, uint128(amount0Decreased), uint128(amount1Decreased));
+    (amountDecreased0, amountDecreased1) = _decreaseLiquidity(msg.sender, liquidity, slippage);
+    _collect(msg.sender, uint128(amountDecreased0), uint128(amountDecreased1));
   }
+
+  function removeLiquidity(uint16 slippage)
+    external
+    onlyOwner
+    returns (uint256 amountRemoved0, uint256 amountRemoved1)
+  {}
 
   function compound(uint16 slippage)
     external
@@ -239,15 +245,15 @@ contract RangePool is IERC721Receiver, Ownable {
       uint256 addedAmount1
     )
   {
-    (uint256 amount0Decreased, uint256 amount1Decreased) = _decreaseLiquidity(
+    (uint256 amountDecreased0, uint256 amountDecreased1) = _decreaseLiquidity(
       msg.sender,
       uint128(ERC20(lpToken).balanceOf(msg.sender)),
       slippage
     );
     (uint256 collected0, uint256 collected1) = _collect(
       address(this),
-      uint128(amount0Decreased),
-      uint128(amount1Decreased)
+      uint128(amountDecreased0),
+      uint128(amountDecreased1)
     );
     (uint256 feesCollected0, uint256 feesCollected1) = _collectFees(address(this));
 
@@ -303,29 +309,29 @@ contract RangePool is IERC721Receiver, Ownable {
     internal
     returns (
       uint128 _liquidityAdded,
-      uint256 _amount0Added,
-      uint256 _amount1Added
+      uint256 _amountAdded0,
+      uint256 _amountAdded1
     )
   {
-    (uint256 amount0Ratioed, uint256 amount1Ratioed) = _convertToRatio(_amount0, _amount1, _slippage);
+    (uint256 amountRatioed0, uint256 amountRatioed1) = _convertToRatio(_amount0, _amount1, _slippage);
 
     if (tokenId == 0) {
-      (tokenId, _liquidityAdded, _amount0Added, _amount1Added) = _mint(
+      (tokenId, _liquidityAdded, _amountAdded0, _amountAdded1) = _mint(
         _recipient,
-        amount0Ratioed,
-        amount1Ratioed,
+        amountRatioed0,
+        amountRatioed1,
         _slippage
       );
 
-      uint256 refund0 = amount0Ratioed.sub(_amount0Added);
-      uint256 refund1 = amount1Ratioed.sub(_amount1Added);
+      uint256 refund0 = amountRatioed0.sub(_amountAdded0);
+      uint256 refund1 = amountRatioed1.sub(_amountAdded1);
       if (refund0 != 0) ERC20(token0).safeTransfer(_recipient, refund0);
       if (refund1 != 0) ERC20(token1).safeTransfer(_recipient, refund1);
     } else {
-      (_liquidityAdded, _amount0Added, _amount1Added) = _increaseLiquidity(
+      (_liquidityAdded, _amountAdded0, _amountAdded1) = _increaseLiquidity(
         _recipient,
-        amount0Ratioed,
-        amount1Ratioed,
+        amountRatioed0,
+        amountRatioed1,
         _slippage
       );
     }
@@ -341,15 +347,15 @@ contract RangePool is IERC721Receiver, Ownable {
     returns (
       uint256 _generatedTokenId,
       uint128 _liquidityAdded,
-      uint256 _amount0Received,
-      uint256 _amount1Received
+      uint256 _amountReceived0,
+      uint256 _amountReceived1
     )
   {
     token0.safeApprove(address(NFPM), type(uint256).max);
     token1.safeApprove(address(NFPM), type(uint256).max);
 
-    uint256 amount0MinAccepted = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
-    uint256 amount1MinAccepted = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
+    uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
+    uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
 
     INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
       token0: token0,
@@ -359,13 +365,13 @@ contract RangePool is IERC721Receiver, Ownable {
       tickUpper: upperTick, //Tick needs to exist (right spacing)
       amount0Desired: _amount0,
       amount1Desired: _amount1,
-      amount0Min: amount0MinAccepted, // slippage check
-      amount1Min: amount1MinAccepted, // slippage check
+      amount0Min: amountMinAccepted0, // slippage check
+      amount1Min: amountMinAccepted1, // slippage check
       recipient: address(this), // receiver of ERC721
       deadline: block.timestamp
     });
 
-    (_generatedTokenId, _liquidityAdded, _amount0Received, _amount1Received) = NFPM.mint(params);
+    (_generatedTokenId, _liquidityAdded, _amountReceived0, _amountReceived1) = NFPM.mint(params);
 
     if (address(lpToken) == address(0)) lpToken = new LP(_generatedTokenId);
     lpToken.mint(_account, _liquidityAdded);
@@ -380,24 +386,24 @@ contract RangePool is IERC721Receiver, Ownable {
     internal
     returns (
       uint128 _liquidityIncreased,
-      uint256 _amount0Increased,
-      uint256 _amount1Increased
+      uint256 _amountIncreased0,
+      uint256 _amountIncreased1
     )
   {
-    uint256 amount0MinAccepted = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
-    uint256 amount1MinAccepted = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
+    uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
+    uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
 
     INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
       .IncreaseLiquidityParams({
         tokenId: tokenId,
         amount0Desired: _amount0,
         amount1Desired: _amount1,
-        amount0Min: amount0MinAccepted,
-        amount1Min: amount1MinAccepted,
+        amount0Min: amountMinAccepted0,
+        amount1Min: amountMinAccepted1,
         deadline: block.timestamp
       });
 
-    (_liquidityIncreased, _amount0Increased, _amount1Increased) = NFPM.increaseLiquidity(params);
+    (_liquidityIncreased, _amountIncreased0, _amountIncreased1) = NFPM.increaseLiquidity(params);
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
   }
@@ -406,7 +412,7 @@ contract RangePool is IERC721Receiver, Ownable {
     address _account,
     uint128 _liquidity,
     uint16 _slippage
-  ) internal returns (uint256 _amount0Decreased, uint256 _amount1Decreased) {
+  ) internal returns (uint256 _amountDecreased0, uint256 _amountDecreased1) {
     require(lpToken.balanceOf(_account) >= _liquidity, 'RangePool: Not enough liquidity');
 
     (uint256 _expectedAmount0, uint256 _expectedAmount1) = LiquidityAmounts.getAmountsForLiquidity(
@@ -416,20 +422,20 @@ contract RangePool is IERC721Receiver, Ownable {
       _liquidity
     );
 
-    uint256 amount0Min = Utils.applySlippageTolerance(false, _expectedAmount0, _slippage, resolution);
-    uint256 amount1Min = Utils.applySlippageTolerance(false, _expectedAmount1, _slippage, resolution);
+    uint256 amountMin0 = Utils.applySlippageTolerance(false, _expectedAmount0, _slippage, resolution);
+    uint256 amountMin1 = Utils.applySlippageTolerance(false, _expectedAmount1, _slippage, resolution);
 
     INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager
       .DecreaseLiquidityParams({
         tokenId: tokenId,
         liquidity: _liquidity,
-        amount0Min: amount0Min,
-        amount1Min: amount1Min,
+        amount0Min: amountMin0,
+        amount1Min: amountMin1,
         deadline: block.timestamp
       });
 
     lpToken.burn(_account, uint256(_liquidity));
-    (_amount0Decreased, _amount1Decreased) = NFPM.decreaseLiquidity(params);
+    (_amountDecreased0, _amountDecreased1) = NFPM.decreaseLiquidity(params);
   }
 
   function _collect(
