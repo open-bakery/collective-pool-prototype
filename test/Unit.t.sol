@@ -45,6 +45,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     performSwaps(tokenA, 100_000_000000, tokenB, fee);
     collectFees();
     performSwaps(tokenA, 100_000_000000, tokenB, fee);
+    compound(1_00);
   }
 
   function testPoolConstruct() internal {
@@ -115,7 +116,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function decreaseLiquidity(uint128 liquidity, uint16 slippage) internal {
-    (uint256 ibLPTokenLP, uint256 ibToken0, uint256 ibToken1) = intialBalances();
+    (uint256 ibTokenLP, uint256 ibToken0, uint256 ibToken1) = intialBalances();
 
     (uint256 amountDecreased0, uint256 amountDecreased1) = rangePool.decreaseLiquidity(liquidity, slippage);
 
@@ -125,7 +126,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       [uint256(amountDecreased0), amountDecreased1, 0, 0, 0, 0]
     );
 
-    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == ibLPTokenLP.sub(uint256(liquidity)));
+    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == ibTokenLP.sub(uint256(liquidity)));
     assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == ibToken0.add(amountDecreased0));
     assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == ibToken1.add(amountDecreased1));
   }
@@ -142,6 +143,19 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
     assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == ibToken0.add(amountCollected0));
     assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == ibToken1.add(amountCollected1));
+  }
+
+  function compound(uint16 slippage) internal {
+    (uint256 ibTokenLP, , ) = intialBalances();
+    (uint128 addedLiquidity, uint256 amountCompounded0, uint256 amountCompounded1) = rangePool.compound(slippage);
+
+    logr(
+      'compound()',
+      ['addedLiquidity', 'amountCompounded0', 'amountCompounded1', '0', '0', '0'],
+      [uint256(addedLiquidity), amountCompounded0, amountCompounded1, 0, 0, 0]
+    );
+
+    assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == ibTokenLP.add(addedLiquidity));
   }
 
   function intialBalances()

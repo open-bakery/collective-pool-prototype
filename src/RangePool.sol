@@ -475,11 +475,11 @@ contract RangePool is IERC721Receiver, Ownable {
     (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
     if (feeAmount0.add(feeAmount1) == 0) return (amountCollected0, amountCollected1);
 
-    (amountCollected0, amountCollected1) = _collect(msg.sender, uint128(feeAmount0), uint128(feeAmount1));
+    (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
     totalClaimedFees0 = totalClaimedFees0.add(amountCollected0);
     totalClaimedFees1 = totalClaimedFees1.add(amountCollected1);
 
-    emit FeesCollected(msg.sender, amountCollected0, amountCollected1);
+    emit FeesCollected(_recipient, amountCollected0, amountCollected1);
   }
 
   function _compound(address _recipient, uint16 _slippage)
