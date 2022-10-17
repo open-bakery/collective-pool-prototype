@@ -14,11 +14,9 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 
-import '@uniswap/v3-periphery/contracts/NonfungiblePositionManager.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 import '@uniswap/v3-periphery/contracts/libraries/PositionValue.sol';
-import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 import '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
 
@@ -32,9 +30,8 @@ import './LP.sol';
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
 contract RangePool is IERC721Receiver, Ownable {
-  using PositionValue for NonfungiblePositionManager;
+  using PositionValue for INonfungiblePositionManager;
   using PoolUtils for IUniswapV3Pool;
-  using TransferHelper for address;
   using Address for address;
   using SafeERC20 for ERC20;
   using RatioCalculator for uint160;
@@ -42,8 +39,8 @@ contract RangePool is IERC721Receiver, Ownable {
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-  NonfungiblePositionManager public constant NFPM =
-    NonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
+  INonfungiblePositionManager public constant NFPM =
+    INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
   IUniswapV3Pool public pool;
   LP public lpToken;
@@ -77,6 +74,10 @@ contract RangePool is IERC721Receiver, Ownable {
   ) {
     pool = IUniswapV3Pool(Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory));
     (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
+
+    ERC20(token0).safeApprove(address(NFPM), type(uint256).max);
+    ERC20(token1).safeApprove(address(NFPM), type(uint256).max);
+
     fee = _fee;
     tickSpacing = pool.tickSpacing();
     (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, _tokenB, _lowerLimitInTokenB, _upperLimitInTokenB);
@@ -208,7 +209,7 @@ contract RangePool is IERC721Receiver, Ownable {
     returns (uint256 amountDecreased0, uint256 amountDecreased1)
   {
     if (uint256(liquidity) == ERC20(lpToken).balanceOf(msg.sender)) {
-      (amountDecreased0, amountDecreased1) = _removeLiquidity(msg.sender, slippage);
+      (amountDecreased0, amountDecreased1) = _removeLiquidity(msg.sender, msg.sender, slippage);
     } else {
       (amountDecreased0, amountDecreased1) = _decreaseLiquidity(msg.sender, liquidity, slippage);
       _collect(msg.sender, uint128(amountDecreased0), uint128(amountDecreased1));
@@ -220,7 +221,7 @@ contract RangePool is IERC721Receiver, Ownable {
     onlyOwner
     returns (uint256 amountRemoved0, uint256 amountRemoved1)
   {
-    (amountRemoved0, amountRemoved1) = _removeLiquidity(msg.sender, slippage);
+    (amountRemoved0, amountRemoved1) = _removeLiquidity(msg.sender, msg.sender, slippage);
   }
 
   function claimNFT() external onlyOwner {
@@ -263,7 +264,8 @@ contract RangePool is IERC721Receiver, Ownable {
     )
   {
     (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, tokenA, lowerLimitA, upperLimitA);
-    (uint256 collected0, uint256 collected1) = _removeLiquidity(msg.sender, slippage);
+    (uint256 collected0, uint256 collected1) = _removeLiquidity(msg.sender, address(this), slippage);
+    tokenId = 0;
     (addedLiquidity, addedAmount0, addedAmount1) = _addLiquidity(msg.sender, collected0, collected1, slippage);
   }
 
@@ -277,7 +279,7 @@ contract RangePool is IERC721Receiver, Ownable {
   ) internal returns (uint256 _amountOut) {
     IUniswapV3Pool swapPool = IUniswapV3Pool(IUniswapV3Factory(uniswapFactory).getPool(_tokenIn, _tokenOut, _fee));
 
-    _tokenIn.safeApprove(address(router), _amountIn);
+    ERC20(_tokenIn).safeApprove(address(router), _amountIn);
 
     uint256 expectedAmountOut = _tokenOut == swapPool.token0()
       ? swapPool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(_amountIn, ERC20(swapPool.token0()).decimals())
@@ -354,9 +356,6 @@ contract RangePool is IERC721Receiver, Ownable {
       uint256 _amountAdded1
     )
   {
-    token0.safeApprove(address(NFPM), type(uint256).max);
-    token1.safeApprove(address(NFPM), type(uint256).max);
-
     uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
     uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
 
@@ -443,12 +442,13 @@ contract RangePool is IERC721Receiver, Ownable {
     (_amountDecreased0, _amountDecreased1) = NFPM.decreaseLiquidity(params);
   }
 
-  function _removeLiquidity(address _account, uint16 _slippage)
-    internal
-    returns (uint256 amountRemoved0, uint256 amountRemoved1)
-  {
+  function _removeLiquidity(
+    address _deductAccount,
+    address _recipient,
+    uint16 _slippage
+  ) internal returns (uint256 totalRemoved0, uint256 totalRemoved1) {
     (uint256 amountRemoved0, uint256 amountRemoved1) = _decreaseLiquidity(
-      _account,
+      _deductAccount,
       uint128(ERC20(lpToken).balanceOf(msg.sender)),
       _slippage
     );
@@ -458,9 +458,13 @@ contract RangePool is IERC721Receiver, Ownable {
     totalClaimedFees0 = totalClaimedFees0.add(feeAmount0);
     totalClaimedFees1 = totalClaimedFees1.add(feeAmount1);
 
-    _collect(_account, uint128(amountRemoved0.add(feeAmount0)), uint128(amountRemoved1.add(feeAmount1)));
+    (totalRemoved0, totalRemoved1) = _collect(
+      _recipient,
+      uint128(amountRemoved0.add(feeAmount0)),
+      uint128(amountRemoved1.add(feeAmount1))
+    );
 
-    emit FeesCollected(_account, feeAmount0, feeAmount1);
+    emit FeesCollected(_recipient, feeAmount0, feeAmount1);
   }
 
   function _collect(

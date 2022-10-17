@@ -15,10 +15,10 @@ import './LocalVars.t.sol';
 import './Logs.t.sol';
 
 contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
-  using PositionValue for NonfungiblePositionManager;
-  using TransferHelper for address;
+  using PositionValue for INonfungiblePositionManager;
   using stdStorage for StdStorage;
   using SafeMath for uint256;
+  using SafeERC20 for ERC20;
 
   RangePool public rangePool;
 
@@ -48,6 +48,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     compound(1_00);
     performSwaps(tokenA, 100_000_000000, tokenB, fee);
     dca(tokenA, 1_00);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, 1_00);
   }
 
   function testPoolConstruct() internal {
@@ -169,6 +170,29 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
     assertTrue(amount > 0);
     assertTrue(ERC20(token).balanceOf(address(this)) == initialBalance.add(amount));
+  }
+
+  function updateRange(
+    address token,
+    uint256 lowerLimit,
+    uint256 upperLimit,
+    uint16 slippage
+  ) internal {
+    (uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = rangePool.updateRange(
+      token,
+      lowerLimit,
+      upperLimit,
+      slippage
+    );
+
+    uint256 newLowerLimit = rangePool.lowerLimit();
+    uint256 newUpperLimit = rangePool.upperLimit();
+
+    logr(
+      'updateRange()',
+      ['addedLiquidity', 'addedAmount0', 'addedAmount1', 'newLowerLimit', 'newUpperLimit', '0'],
+      [uint256(addedLiquidity), addedAmount0, addedAmount1, newLowerLimit, newUpperLimit, 0]
+    );
   }
 
   function intialBalances()
