@@ -46,6 +46,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     collectFees();
     performSwaps(tokenA, 100_000_000000, tokenB, fee);
     compound(1_00);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee);
+    dca(tokenA, 1_00);
   }
 
   function testPoolConstruct() internal {
@@ -156,6 +158,17 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     );
 
     assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == ibTokenLP.add(addedLiquidity));
+  }
+
+  function dca(address token, uint16 slippage) internal {
+    (, uint256 ibToken0, uint256 ibToken1) = intialBalances();
+    uint256 initialBalance = (token == rangePool.token0()) ? ibToken0 : ibToken1;
+    uint256 amount = rangePool.dca(token, slippage);
+
+    logr('dca()', ['amount', '0', '0', '0', '0', '0'], [uint256(amount), 0, 0, 0, 0, 0]);
+
+    assertTrue(amount > 0);
+    assertTrue(ERC20(token).balanceOf(address(this)) == initialBalance.add(amount));
   }
 
   function intialBalances()

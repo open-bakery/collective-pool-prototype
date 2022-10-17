@@ -66,6 +66,7 @@ contract RangePool is IERC721Receiver, Ownable {
   event LiquidityIncreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
+  event DCA(address indexed recipient, uint256 amount);
 
   constructor(
     address _tokenA,
@@ -241,6 +242,10 @@ contract RangePool is IERC721Receiver, Ownable {
     )
   {
     (addedLiquidity, amountCompounded0, amountCompounded1) = _compound(msg.sender, slippage);
+  }
+
+  function dca(address wantToken, uint16 slippage) public returns (uint256) {
+    return _dcaSimple(msg.sender, wantToken, slippage);
   }
 
   function updateRange(
@@ -501,7 +506,31 @@ contract RangePool is IERC721Receiver, Ownable {
     );
   }
 
-  function _dca(address token) internal returns (uint256 amountAcquired) {}
+  function _dcaSimple(
+    address _recipient,
+    address _wantToken,
+    uint16 _slippage
+  ) internal returns (uint256 amountSent) {
+    require(
+      _wantToken == token0 || _wantToken == token1,
+      'RangePool: Can only DCA into a token belonging to this pool'
+    );
+
+    (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
+
+    (address tokenIn, address tokenOut) = (_wantToken == token0) ? (token1, token0) : (token0, token1);
+    (uint256 amountIn, uint256 amountCollected) = (tokenIn == token0)
+      ? (amountCollected0, amountCollected1)
+      : (amountCollected1, amountCollected0);
+
+    uint256 amountAcquired = _swap(address(this), tokenIn, tokenOut, fee, amountIn, _slippage);
+
+    uint256 totalAmount = amountAcquired.add(amountCollected);
+
+    amountSent = Utils.safeBalanceTransfer(_wantToken, address(this), _recipient, totalAmount);
+
+    emit DCA(_recipient, amountSent);
+  }
 
   function _convertToRatio(
     address _recipient,

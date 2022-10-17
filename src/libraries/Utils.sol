@@ -2,6 +2,7 @@
 pragma solidity >=0.5.0 <0.8.14;
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
@@ -15,6 +16,7 @@ import './Conversions.sol';
 
 library Utils {
   using SafeMath for uint256;
+  using SafeERC20 for ERC20;
 
   function getPoolAddress(
     address tokenA,
@@ -97,6 +99,17 @@ library Utils {
       pool.tickSpacing(),
       ERC20(pool.token0()).decimals()
     );
+  }
+
+  function safeBalanceTransfer(
+    address token,
+    address sender,
+    address recipient,
+    uint256 amount
+  ) external returns (uint256 amountSend) {
+    uint256 balance = ERC20(token).balanceOf(sender);
+    amountSend = (amount > balance) ? balance : amount;
+    ERC20(token).safeTransfer(recipient, amountSend);
   }
 
   function _getValidatedTickNumber(
