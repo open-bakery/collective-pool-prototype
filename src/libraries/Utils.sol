@@ -18,31 +18,13 @@ library Utils {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
-  function getPoolAddress(
-    address tokenA,
-    address tokenB,
-    uint24 fee,
-    address uniswapFactory
-  ) internal pure returns (address) {
-    return PoolAddress.computeAddress(uniswapFactory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
-  }
-
-  function orderTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
-    require(tokenA != tokenB, 'Utils: Equal tokens');
-    (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-  }
-
   function priceToken0(
     uint256 priceToken1,
     uint8 decimalsToken0,
     uint8 decimalsToken1
-  ) internal pure returns (uint256) {
+  ) public pure returns (uint256) {
     if (priceToken1 == 0) priceToken1 = 1;
     return (10**(SafeMath.add(decimalsToken0, decimalsToken1))).div(priceToken1);
-  }
-
-  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0) internal pure returns (uint256) {
-    return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
   }
 
   function convertLimitsToTicks(
@@ -50,14 +32,43 @@ library Utils {
     uint256 upperLimit,
     int24 tickSpacing,
     uint8 decimalsToken0
-  ) internal pure returns (int24 lowerTick, int24 upperTick) {
+  ) public pure returns (int24 lowerTick, int24 upperTick) {
     int24 tickL = _getValidatedTickNumber(lowerLimit, decimalsToken0, tickSpacing);
     int24 tickU = _getValidatedTickNumber(upperLimit, decimalsToken0, tickSpacing);
     (lowerTick, upperTick) = _orderTicks(tickL, tickU);
   }
 
+  function safeBalanceTransfer(
+    address token,
+    address sender,
+    address recipient,
+    uint256 amount
+  ) external returns (uint256 amountSend) {
+    uint256 balance = ERC20(token).balanceOf(sender);
+    amountSend = (amount > balance) ? balance : amount;
+    ERC20(token).safeTransfer(recipient, amountSend);
+  }
+
+  function getPoolAddress(
+    address tokenA,
+    address tokenB,
+    uint24 fee,
+    address uniswapFactory
+  ) external pure returns (address) {
+    return PoolAddress.computeAddress(uniswapFactory, PoolAddress.getPoolKey(tokenA, tokenB, fee));
+  }
+
+  function orderTokens(address tokenA, address tokenB) external pure returns (address token0, address token1) {
+    require(tokenA != tokenB, 'Utils: Equal tokens');
+    (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+  }
+
+  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0) external pure returns (uint256) {
+    return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
+  }
+
   function getAmounts(uint128 liquidity, uint160 sqrtPriceX96)
-    internal
+    external
     pure
     returns (uint256 amount0, uint256 amount1)
   {
@@ -70,7 +81,7 @@ library Utils {
     uint256 amount,
     uint16 slippage,
     uint16 resolution
-  ) internal pure returns (uint256 amountAccepted) {
+  ) external pure returns (uint256 amountAccepted) {
     amountAccepted = positive
       ? (amount.mul(slippage).div(resolution)).add(amount)
       : amount.sub(amount.mul(slippage).div(resolution));
@@ -81,7 +92,7 @@ library Utils {
     address token,
     uint256 lowerLimit,
     uint256 upperLimit
-  ) internal returns (int24 lowerTick, int24 upperTick) {
+  ) external returns (int24 lowerTick, int24 upperTick) {
     require(lowerLimit != upperLimit, 'RangePool: Limits must be within a range');
 
     (lowerLimit, upperLimit) = (lowerLimit < upperLimit) ? (lowerLimit, upperLimit) : (upperLimit, lowerLimit);
@@ -89,8 +100,8 @@ library Utils {
     if (lowerLimit == 0) upperLimit = 1;
 
     if (token != pool.token1()) {
-      lowerLimit = Utils.priceToken0(lowerLimit, ERC20(pool.token0()).decimals(), ERC20(pool.token1()).decimals());
-      upperLimit = Utils.priceToken0(upperLimit, ERC20(pool.token0()).decimals(), ERC20(pool.token1()).decimals());
+      lowerLimit = priceToken0(lowerLimit, ERC20(pool.token0()).decimals(), ERC20(pool.token1()).decimals());
+      upperLimit = priceToken0(upperLimit, ERC20(pool.token0()).decimals(), ERC20(pool.token1()).decimals());
     }
 
     (lowerTick, upperTick) = convertLimitsToTicks(
@@ -99,17 +110,6 @@ library Utils {
       pool.tickSpacing(),
       ERC20(pool.token0()).decimals()
     );
-  }
-
-  function safeBalanceTransfer(
-    address token,
-    address sender,
-    address recipient,
-    uint256 amount
-  ) external returns (uint256 amountSend) {
-    uint256 balance = ERC20(token).balanceOf(sender);
-    amountSend = (amount > balance) ? balance : amount;
-    ERC20(token).safeTransfer(recipient, amountSend);
   }
 
   function _getValidatedTickNumber(

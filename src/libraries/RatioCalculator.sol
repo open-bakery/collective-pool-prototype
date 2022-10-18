@@ -19,7 +19,7 @@ library RatioCalculator {
     int24 upperTick,
     uint8 decimalsToken0,
     uint16 precision
-  ) internal view returns (uint256 amountRatioed0, uint256 amountRatioed1) {
+  ) external view returns (uint256 amountRatioed0, uint256 amountRatioed1) {
     (uint256 amount0ConvertedToToken1, uint256 amount1) = _applyRatio(
       sqrtPriceX96,
       liquidity,
@@ -39,7 +39,7 @@ library RatioCalculator {
     uint160 sqrtPriceX96,
     uint256 amount0,
     uint8 decimalsToken0
-  ) internal pure returns (uint256 amount0ConvertedToToken1) {
+  ) public pure returns (uint256 amount0ConvertedToToken1) {
     uint256 price = Conversions.sqrtPriceX96ToUint(sqrtPriceX96, decimalsToken0);
     amount0ConvertedToToken1 = amount0.mul(price).div(10**decimalsToken0);
   }
@@ -48,7 +48,7 @@ library RatioCalculator {
     uint160 sqrtPriceX96,
     uint256 amount1,
     uint8 decimalsToken0
-  ) internal pure returns (uint256 amount1ConvertedToToken0) {
+  ) public pure returns (uint256 amount1ConvertedToToken0) {
     uint256 price = Conversions.sqrtPriceX96ToUint(sqrtPriceX96, decimalsToken0);
     if (price == 0) return 0;
     amount1ConvertedToToken0 = amount1.mul(10**decimalsToken0).div(price);

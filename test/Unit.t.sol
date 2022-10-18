@@ -8,6 +8,8 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
+import '../src/libraries/Lens.sol';
+
 import '../src/RangePool.sol';
 import '../src/DepositRatioCalculator.sol';
 import '../src/logs/Logs.sol';
@@ -19,6 +21,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using stdStorage for StdStorage;
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
+  using Lens for RangePool;
 
   RangePool public rangePool;
 

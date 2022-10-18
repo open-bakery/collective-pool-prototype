@@ -4,8 +4,11 @@ pragma abicoder v2;
 
 import '../src/RangePool.sol';
 import '../src/logs/Logs.sol';
+import '../src/libraries/Lens.sol';
 
 contract LogsTest is Test, Logs {
+  using Lens for RangePool;
+
   function logPrincipal(RangePool rangePool) public view {
     (uint256 amount0, uint256 amount1) = rangePool.principal();
     logr('logPrincipal()', ['amount0', 'amount1', '0', '0', '0', '0'], [uint256(amount0), amount1, 0, 0, 0, 0]);

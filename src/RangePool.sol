@@ -21,7 +21,7 @@ import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 import '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
 
 import './libraries/RatioCalculator.sol';
-import './libraries/Conversions.sol';
+import './libraries/Swapper.sol';
 import './libraries/Utils.sol';
 import './libraries/PoolUtils.sol';
 import './libraries/Math.sol';
@@ -29,7 +29,7 @@ import './LP.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
-contract RangePool is IERC721Receiver, Ownable {
+contract RangePool is Ownable {
   using PositionValue for INonfungiblePositionManager;
   using PoolUtils for IUniswapV3Pool;
   using Address for address;
@@ -81,50 +81,6 @@ contract RangePool is IERC721Receiver, Ownable {
     fee = _fee;
     tickSpacing = pool.tickSpacing();
     (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, _tokenB, _lowerLimitInTokenB, _upperLimitInTokenB);
-  }
-
-  function onERC721Received(
-    address operator,
-    address from,
-    uint256 id,
-    bytes calldata data
-  ) external view override returns (bytes4) {
-    operator;
-    from;
-    id;
-    data;
-
-    return this.onERC721Received.selector;
-  }
-
-  function principal() external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = NFPM.principal(tokenId, pool.sqrtPriceX96());
-  }
-
-  function unclaimedFees() public view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = NFPM.fees(tokenId);
-  }
-
-  function sqrtPriceX96() external view returns (uint160) {
-    return pool.sqrtPriceX96();
-  }
-
-  function price() external view returns (uint256) {
-    return pool.uintPrice();
-  }
-
-  function oraclePrice(uint32 secondsElapsed) external view returns (uint256) {
-    return pool.oracleUintPrice(secondsElapsed);
-  }
-
-  function prices() external view returns (uint256 priceToken0, uint256 priceToken1) {
-    priceToken1 = pool.uintPrice();
-    priceToken0 = Utils.priceToken0(priceToken1, ERC20(token0).decimals(), ERC20(token1).decimals());
-  }
-
-  function oraclePrices(uint32 secondsElapsed) external view returns (uint256 priceToken0, uint256 priceToken1) {
-    priceToken1 = pool.oracleUintPrice(secondsElapsed);
-    priceToken0 = Utils.priceToken0(priceToken1, ERC20(token0).decimals(), ERC20(token1).decimals());
   }
 
   function lowerLimit() external view returns (uint256) {
@@ -267,42 +223,6 @@ contract RangePool is IERC721Receiver, Ownable {
     (uint256 collected0, uint256 collected1) = _removeLiquidity(msg.sender, address(this), slippage);
     tokenId = 0;
     (addedLiquidity, addedAmount0, addedAmount1) = _addLiquidity(msg.sender, collected0, collected1, slippage);
-  }
-
-  function _swap(
-    address _recipient,
-    address _tokenIn,
-    address _tokenOut,
-    uint24 _fee,
-    uint256 _amountIn,
-    uint16 _slippage
-  ) internal returns (uint256 _amountOut) {
-    IUniswapV3Pool swapPool = IUniswapV3Pool(IUniswapV3Factory(uniswapFactory).getPool(_tokenIn, _tokenOut, _fee));
-
-    ERC20(_tokenIn).safeApprove(address(router), _amountIn);
-
-    uint256 expectedAmountOut = _tokenOut == swapPool.token0()
-      ? swapPool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(_amountIn, ERC20(swapPool.token0()).decimals())
-      : swapPool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(_amountIn, ERC20(swapPool.token0()).decimals());
-
-    uint256 amountOutMinimum = Utils.applySlippageTolerance(false, expectedAmountOut, _slippage, resolution);
-
-    uint160 sqrtPriceLimitX96 = _tokenIn == swapPool.token1()
-      ? uint160(Utils.applySlippageTolerance(true, uint256(swapPool.sqrtPriceX96()), _slippage, resolution))
-      : uint160(Utils.applySlippageTolerance(false, uint256(swapPool.sqrtPriceX96()), _slippage, resolution));
-
-    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-      tokenIn: _tokenIn,
-      tokenOut: _tokenOut,
-      fee: _fee,
-      recipient: _recipient,
-      deadline: block.timestamp,
-      amountIn: _amountIn,
-      amountOutMinimum: amountOutMinimum,
-      sqrtPriceLimitX96: sqrtPriceLimitX96
-    });
-
-    _amountOut = router.exactInputSingle(params);
   }
 
   function _addLiquidity(
@@ -527,7 +447,16 @@ contract RangePool is IERC721Receiver, Ownable {
       ? (amountCollected0, amountCollected1)
       : (amountCollected1, amountCollected0);
 
-    uint256 amountAcquired = _swap(address(this), tokenIn, tokenOut, fee, amountIn, _slippage);
+    uint256 amountAcquired = Swapper.swap(
+      address(this),
+      tokenIn,
+      tokenOut,
+      fee,
+      amountIn,
+      _slippage,
+      oracleSeconds,
+      resolution
+    );
 
     uint256 totalAmount = amountAcquired.add(amountCollected);
 
@@ -559,13 +488,13 @@ contract RangePool is IERC721Receiver, Ownable {
     if (_amount0 > targetAmount0) {
       diff = _amount0.sub(targetAmount0);
       amount0 = amount0.sub(diff);
-      amount1 = amount1.add(_swap(_recipient, token0, token1, fee, diff, _slippage));
+      amount1 = amount1.add(Swapper.swap(_recipient, token0, token1, fee, diff, _slippage, oracleSeconds, resolution));
     }
 
     if (_amount1 > targetAmount1) {
       diff = _amount1.sub(targetAmount1);
       amount1 = amount1.sub(diff);
-      amount0 = amount0.add(_swap(_recipient, token1, token0, fee, diff, _slippage));
+      amount0 = amount0.add(Swapper.swap(_recipient, token1, token0, fee, diff, _slippage, oracleSeconds, resolution));
     }
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);

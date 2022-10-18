@@ -16,20 +16,20 @@ import './Conversions.sol';
 library PoolUtils {
   using SafeMath for uint256;
 
-  function sqrtPriceX96(IUniswapV3Pool pool) internal view returns (uint160 sqrtPriceX96) {
+  function sqrtPriceX96(IUniswapV3Pool pool) public view returns (uint160 sqrtPriceX96) {
     (sqrtPriceX96, , , , , , ) = pool.slot0();
   }
 
-  function oracleSqrtPricex96(IUniswapV3Pool pool, uint32 elapsedSeconds) internal view returns (uint160) {
+  function oracleSqrtPricex96(IUniswapV3Pool pool, uint32 elapsedSeconds) public view returns (uint160) {
     (int24 arithmeticMeanTick, ) = OracleLibrary.consult(address(pool), elapsedSeconds);
     return TickMath.getSqrtRatioAtTick(arithmeticMeanTick);
   }
 
-  function uintPrice(IUniswapV3Pool pool) internal view returns (uint256) {
+  function uintPrice(IUniswapV3Pool pool) external view returns (uint256) {
     return Conversions.sqrtPriceX96ToUint(sqrtPriceX96(pool), ERC20(pool.token0()).decimals());
   }
 
-  function oracleUintPrice(IUniswapV3Pool pool, uint32 elapsedSeconds) internal view returns (uint256) {
+  function oracleUintPrice(IUniswapV3Pool pool, uint32 elapsedSeconds) external view returns (uint256) {
     return Conversions.sqrtPriceX96ToUint(oracleSqrtPricex96(pool, elapsedSeconds), ERC20(pool.token0()).decimals());
   }
 }

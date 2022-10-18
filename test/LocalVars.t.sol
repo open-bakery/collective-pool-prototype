@@ -15,6 +15,8 @@ contract LocalVars is Test {
   INonfungiblePositionManager public NFPM = INonfungiblePositionManager(vm.envAddress('UNISWAP_V3_NFPM'));
   ISwapRouter public router = ISwapRouter(vm.envAddress('UNISWAP_V3_ROUTER'));
 
+  address public WETH = vm.envAddress('WETH');
+
   address public ARB_WETH = vm.envAddress('ARB_WETH');
   address public ARB_USDC = vm.envAddress('ARB_USDC');
   address public ARB_GMX = vm.envAddress('ARB_GMX');
