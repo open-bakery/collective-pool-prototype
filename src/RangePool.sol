@@ -4,7 +4,6 @@ pragma abicoder v2;
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
-import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
@@ -12,7 +11,6 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
-import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 import '@uniswap/v3-periphery/contracts/libraries/PositionValue.sol';
@@ -37,10 +35,6 @@ contract RangePool is Ownable {
   using RatioCalculator for uint160;
   using SafeMath for uint256;
 
-  address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
-  INonfungiblePositionManager public constant NFPM =
-    INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
-
   IUniswapV3Pool public pool;
   LP public lpToken;
 
@@ -57,8 +51,6 @@ contract RangePool is Ownable {
   uint256 public totalClaimedFees0;
   uint256 public totalClaimedFees1;
 
-  uint16 constant resolution = 10_000;
-
   event LiquidityIncreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
@@ -71,11 +63,11 @@ contract RangePool is Ownable {
     uint256 _lowerLimitInTokenB,
     uint256 _upperLimitInTokenB
   ) {
-    pool = IUniswapV3Pool(Utils.getPoolAddress(_tokenA, _tokenB, _fee, uniswapFactory));
+    pool = IUniswapV3Pool(Utils.getPoolAddress(_tokenA, _tokenB, _fee, Lens.uniswapFactory));
     (token0, token1) = Utils.orderTokens(_tokenA, _tokenB);
 
-    ERC20(token0).safeApprove(address(NFPM), type(uint256).max);
-    ERC20(token1).safeApprove(address(NFPM), type(uint256).max);
+    ERC20(token0).safeApprove(address(Lens.NFPM), type(uint256).max);
+    ERC20(token1).safeApprove(address(Lens.NFPM), type(uint256).max);
 
     fee = _fee;
     tickSpacing = pool.tickSpacing();
@@ -110,7 +102,7 @@ contract RangePool is Ownable {
       lowerTick,
       upperTick,
       ERC20(token0).decimals(),
-      resolution
+      Lens.resolution
     );
   }
 
@@ -155,7 +147,7 @@ contract RangePool is Ownable {
 
   function claimNFT() external onlyOwner {
     LP(lpToken).burn(msg.sender, LP(lpToken).balanceOf(msg.sender));
-    NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
+    Lens.NFPM.safeTransferFrom(address(this), msg.sender, tokenId);
   }
 
   function collectFees() external onlyOwner returns (uint256 amountCollected0, uint256 amountCollected1) {
@@ -249,8 +241,8 @@ contract RangePool is Ownable {
       uint256 _amountAdded1
     )
   {
-    uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
-    uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
+    uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, Lens.resolution);
+    uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, Lens.resolution);
 
     INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
       token0: token0,
@@ -266,7 +258,7 @@ contract RangePool is Ownable {
       deadline: block.timestamp
     });
 
-    (_generatedTokenId, _liquidityAdded, _amountAdded0, _amountAdded1) = NFPM.mint(params);
+    (_generatedTokenId, _liquidityAdded, _amountAdded0, _amountAdded1) = Lens.NFPM.mint(params);
 
     if (address(lpToken) == address(0)) lpToken = new LP(_generatedTokenId);
     lpToken.mint(_account, _liquidityAdded);
@@ -286,8 +278,8 @@ contract RangePool is Ownable {
       uint256 _amountIncreased1
     )
   {
-    uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, resolution);
-    uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, resolution);
+    uint256 amountMinAccepted0 = Utils.applySlippageTolerance(false, _amount0, _slippage, Lens.resolution);
+    uint256 amountMinAccepted1 = Utils.applySlippageTolerance(false, _amount1, _slippage, Lens.resolution);
 
     INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
       .IncreaseLiquidityParams({
@@ -299,7 +291,7 @@ contract RangePool is Ownable {
         deadline: block.timestamp
       });
 
-    (_liquidityIncreased, _amountIncreased0, _amountIncreased1) = NFPM.increaseLiquidity(params);
+    (_liquidityIncreased, _amountIncreased0, _amountIncreased1) = Lens.NFPM.increaseLiquidity(params);
 
     lpToken.mint(_recipient, uint256(_liquidityIncreased));
     emit LiquidityIncreased(_recipient, _amountIncreased0, _amountIncreased1, _liquidityIncreased);
@@ -319,8 +311,8 @@ contract RangePool is Ownable {
       _liquidity
     );
 
-    uint256 amountMin0 = Utils.applySlippageTolerance(false, _expectedAmount0, _slippage, resolution);
-    uint256 amountMin1 = Utils.applySlippageTolerance(false, _expectedAmount1, _slippage, resolution);
+    uint256 amountMin0 = Utils.applySlippageTolerance(false, _expectedAmount0, _slippage, Lens.resolution);
+    uint256 amountMin1 = Utils.applySlippageTolerance(false, _expectedAmount1, _slippage, Lens.resolution);
 
     INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager
       .DecreaseLiquidityParams({
@@ -332,7 +324,7 @@ contract RangePool is Ownable {
       });
 
     lpToken.burn(_account, uint256(_liquidity));
-    (_amountDecreased0, _amountDecreased1) = NFPM.decreaseLiquidity(params);
+    (_amountDecreased0, _amountDecreased1) = Lens.NFPM.decreaseLiquidity(params);
   }
 
   function _removeLiquidity(
@@ -346,7 +338,7 @@ contract RangePool is Ownable {
       _slippage
     );
 
-    (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
+    (uint256 feeAmount0, uint256 feeAmount1) = Lens.NFPM.fees(tokenId);
 
     totalClaimedFees0 = totalClaimedFees0.add(feeAmount0);
     totalClaimedFees1 = totalClaimedFees1.add(feeAmount1);
@@ -372,11 +364,11 @@ contract RangePool is Ownable {
       amount1Max: _amount1
     });
 
-    (amountCollected0, amountCollected1) = NFPM.collect(params);
+    (amountCollected0, amountCollected1) = Lens.NFPM.collect(params);
   }
 
   function _collectFees(address _recipient) internal returns (uint256 amountCollected0, uint256 amountCollected1) {
-    (uint256 feeAmount0, uint256 feeAmount1) = NFPM.fees(tokenId);
+    (uint256 feeAmount0, uint256 feeAmount1) = Lens.NFPM.fees(tokenId);
     if (feeAmount0.add(feeAmount1) == 0) return (amountCollected0, amountCollected1);
 
     (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
@@ -428,7 +420,7 @@ contract RangePool is Ownable {
       amountIn,
       _slippage,
       oracleSeconds,
-      resolution
+      Lens.resolution
     );
 
     uint256 totalAmount = amountAcquired.add(amountCollected);
@@ -451,7 +443,7 @@ contract RangePool is Ownable {
       lowerTick,
       upperTick,
       ERC20(token0).decimals(),
-      resolution
+      Lens.resolution
     );
 
     amount0 = _amount0;
@@ -461,13 +453,17 @@ contract RangePool is Ownable {
     if (_amount0 > targetAmount0) {
       diff = _amount0.sub(targetAmount0);
       amount0 = amount0.sub(diff);
-      amount1 = amount1.add(Swapper.swap(_recipient, token0, token1, fee, diff, _slippage, oracleSeconds, resolution));
+      amount1 = amount1.add(
+        Swapper.swap(_recipient, token0, token1, fee, diff, _slippage, oracleSeconds, Lens.resolution)
+      );
     }
 
     if (_amount1 > targetAmount1) {
       diff = _amount1.sub(targetAmount1);
       amount1 = amount1.sub(diff);
-      amount0 = amount0.add(Swapper.swap(_recipient, token1, token0, fee, diff, _slippage, oracleSeconds, resolution));
+      amount0 = amount0.add(
+        Swapper.swap(_recipient, token1, token0, fee, diff, _slippage, oracleSeconds, Lens.resolution)
+      );
     }
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);

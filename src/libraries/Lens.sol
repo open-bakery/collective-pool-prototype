@@ -16,6 +16,8 @@ library Lens {
 
   INonfungiblePositionManager public constant NFPM =
     INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
+  address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+  uint16 constant resolution = 10_000;
 
   function principal(RangePool rp) external view returns (uint256 amount0, uint256 amount1) {
     (amount0, amount1) = NFPM.principal(rp.tokenId(), rp.pool().sqrtPriceX96());
