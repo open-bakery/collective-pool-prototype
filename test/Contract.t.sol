@@ -11,7 +11,7 @@ contract ContractTest is Test, Logs, LocalVars {
 
   function setUp() public {}
 
-  function testDepositRatioCalculator() public {
+  function testDepositRatioCalculator() public view {
     uint256 amountA = 0.2178 ether;
     uint256 amountB = 57_800000;
 

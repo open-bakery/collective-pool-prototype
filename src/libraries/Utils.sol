@@ -92,7 +92,7 @@ library Utils {
     address token,
     uint256 lowerLimit,
     uint256 upperLimit
-  ) external returns (int24 lowerTick, int24 upperTick) {
+  ) external view returns (int24 lowerTick, int24 upperTick) {
     require(lowerLimit != upperLimit, 'RangePool: Limits must be within a range');
 
     (lowerLimit, upperLimit) = (lowerLimit < upperLimit) ? (lowerLimit, upperLimit) : (upperLimit, lowerLimit);

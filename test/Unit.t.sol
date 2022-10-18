@@ -45,11 +45,11 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     addLiquidity(20_000_000000, 5 ether, 1_00);
     increaseLiquidity(4_000_000000, 1 ether, 1_00);
     decreaseLiquidity(uint128(ERC20(rangePool.lpToken()).balanceOf(address(this)).div(2)), 1_00);
-    performSwaps(tokenA, 100_000_000000, tokenB, fee);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     collectFees();
-    performSwaps(tokenA, 100_000_000000, tokenB, fee);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     compound(1_00);
-    performSwaps(tokenA, 100_000_000000, tokenB, fee);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     dca(tokenA, 1_00);
     updateRange(MAIN_USDC, 1200_000000, 1800_000000, 1_00);
   }
@@ -200,6 +200,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   function intialBalances()
     internal
+    view
     returns (
       uint256 amountLP,
       uint256 amount0,
@@ -215,7 +216,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     address tokenA,
     uint256 amountA,
     address tokenB,
-    uint24 fee
+    uint24 fee,
+    uint8 swaps
   ) internal {
     ERC20(tokenA).approve(address(router), type(uint256).max);
     ERC20(tokenB).approve(address(router), type(uint256).max);
@@ -225,8 +227,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
     receivedB = swap(tokenA, tokenB, fee, amountA);
 
-    uint256 times = 10;
-    for (uint256 i = 0; i < times; i++) {
+    for (uint8 i = 0; i < swaps; i++) {
       receivedA = swap(tokenB, tokenA, fee, receivedB);
       receivedB = swap(tokenA, tokenB, fee, receivedA);
     }

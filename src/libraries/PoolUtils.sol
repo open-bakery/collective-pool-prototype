@@ -16,8 +16,8 @@ import './Conversions.sol';
 library PoolUtils {
   using SafeMath for uint256;
 
-  function sqrtPriceX96(IUniswapV3Pool pool) public view returns (uint160 sqrtPriceX96) {
-    (sqrtPriceX96, , , , , , ) = pool.slot0();
+  function sqrtPriceX96(IUniswapV3Pool pool) public view returns (uint160 _sqrtPriceX96) {
+    (_sqrtPriceX96, , , , , , ) = pool.slot0();
   }
 
   function oracleSqrtPricex96(IUniswapV3Pool pool, uint32 elapsedSeconds) public view returns (uint160) {
