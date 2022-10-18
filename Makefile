@@ -16,6 +16,6 @@ testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
 
 testArb:; forge test -vvv --mt testArbitrum*  --fork-url $(ARBITRUM_RPC_ALCHEMY)
 
-testLogs:; forge test -vvv --mc LogsTest* --fork-url $(FORK_RPC_URL)
+testLogs:; forge test -vvv --mt testFullLogs* --fork-url $(FORK_RPC_URL)
 
 testGas:; forge test -vv --mc GasTest --gas-report --fork-url $(ARBITRUM_RPC_ALCHEMY)

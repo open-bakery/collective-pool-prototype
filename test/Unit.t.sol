@@ -24,23 +24,38 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using Lens for RangePool;
 
   RangePool public rangePool;
+  address public tokenA;
+  address public tokenB;
+  uint24 public fee;
+  uint256 public lowerLimitB;
+  uint256 public upperLimitB;
 
-  function setUp() public {}
+  function setUp() public {
+    tokenA = MAIN_USDC;
+    tokenB = MAIN_WETH;
+    fee = 500;
+    lowerLimitB = 0.001 ether;
+    upperLimitB = 0.0005 ether;
+  }
 
   function testAnvil() public returns (uint256) {}
 
-  function testArbitrum() public {
-    // testCases(0, ARB_WETH, 5 ether, ARB_USDC, 20000_000000, 500);
-    // fullLogs(ARB_WETH, 5 ether, ARB_USDC, 2000_000000, 500);
+  function testArbitrum() public {}
+
+  function testFullLogs() public {
+    initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
+    addLiquidity(20_000_000000, 5 ether, 1_00);
+    logPrincipal(rangePool);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    logUnclaimedFees(rangePool);
+    logAveragePrices(rangePool);
+    logTokenAmountsAtLimits(rangePool);
+    logPrices(rangePool);
+    logOraclePrices(rangePool, 60);
+    logLimits(rangePool);
   }
 
   function testMainnet() public {
-    address tokenA = MAIN_USDC;
-    address tokenB = MAIN_WETH;
-    uint24 fee = 500;
-    uint256 lowerLimitB = 0.001 ether;
-    uint256 upperLimitB = 0.0005 ether;
-
     initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
     addLiquidity(20_000_000000, 5 ether, 1_00);
     increaseLiquidity(4_000_000000, 1 ether, 1_00);
@@ -60,15 +75,15 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function initialize(
-    address token0,
-    address token1,
-    uint24 fee,
-    uint256 lowerLimit,
-    uint256 upperLimit
+    address _token0,
+    address _token1,
+    uint24 _fee,
+    uint256 _lowerLimit,
+    uint256 _upperLimit
   ) internal {
-    rangePool = new RangePool(token0, token1, fee, lowerLimit, upperLimit);
-    ERC20(token0).approve(address(rangePool), type(uint256).max);
-    ERC20(token1).approve(address(rangePool), type(uint256).max);
+    rangePool = new RangePool(_token0, _token1, _fee, _lowerLimit, _upperLimit);
+    ERC20(_token0).approve(address(rangePool), type(uint256).max);
+    ERC20(_token1).approve(address(rangePool), type(uint256).max);
   }
 
   function addLiquidity(
@@ -213,33 +228,33 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function performSwaps(
-    address tokenA,
-    uint256 amountA,
-    address tokenB,
-    uint24 fee,
-    uint8 swaps
+    address _tokenA,
+    uint256 _amountA,
+    address _tokenB,
+    uint24 _fee,
+    uint8 _swaps
   ) internal {
-    ERC20(tokenA).approve(address(router), type(uint256).max);
-    ERC20(tokenB).approve(address(router), type(uint256).max);
-    deal(address(tokenA), address(this), amountA);
+    ERC20(_tokenA).approve(address(router), type(uint256).max);
+    ERC20(_tokenB).approve(address(router), type(uint256).max);
+    deal(address(_tokenA), address(this), _amountA);
     uint256 receivedA;
     uint256 receivedB;
 
-    receivedB = swap(tokenA, tokenB, fee, amountA);
+    receivedB = swap(_tokenA, _tokenB, _fee, _amountA);
 
-    for (uint8 i = 0; i < swaps; i++) {
-      receivedA = swap(tokenB, tokenA, fee, receivedB);
-      receivedB = swap(tokenA, tokenB, fee, receivedA);
+    for (uint8 i = 0; i < _swaps; i++) {
+      receivedA = swap(_tokenB, _tokenA, _fee, receivedB);
+      receivedB = swap(_tokenA, _tokenB, _fee, receivedA);
     }
   }
 
   function swap(
     address tokenIn,
     address tokenOut,
-    uint24 fee,
+    uint24 _fee,
     uint256 amountIn
   ) internal returns (uint256 amountOut) {
-    IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(tokenIn, tokenOut, fee));
+    IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(tokenIn, tokenOut, _fee));
     (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
     uint160 limit = pool.token0() == tokenIn ? sqrtPriceX96 - sqrtPriceX96 / 10 : sqrtPriceX96 + sqrtPriceX96 / 10;
@@ -247,7 +262,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: fee,
+      fee: _fee,
       recipient: address(this),
       deadline: block.timestamp,
       amountIn: amountIn,
