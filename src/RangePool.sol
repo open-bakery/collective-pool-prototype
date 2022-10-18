@@ -14,7 +14,6 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FixedPoint96.sol';
 
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 import '@uniswap/v3-periphery/contracts/libraries/PositionValue.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
@@ -25,6 +24,7 @@ import './libraries/Swapper.sol';
 import './libraries/Utils.sol';
 import './libraries/PoolUtils.sol';
 import './libraries/Math.sol';
+import './libraries/Lens.sol';
 import './LP.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
@@ -38,7 +38,6 @@ contract RangePool is Ownable {
   using SafeMath for uint256;
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
-  ISwapRouter public constant router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
   INonfungiblePositionManager public constant NFPM =
     INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
@@ -89,32 +88,6 @@ contract RangePool is Ownable {
 
   function upperLimit() external view returns (uint256) {
     return _upperLimit();
-  }
-
-  function tokenAmountsAtLowerLimit() external view returns (uint256 amount0, uint256 amount1) {
-    (uint256 lowerAmount0, ) = Utils.getAmounts(
-      uint128(LP(lpToken).balanceOf(owner())),
-      TickMath.getSqrtRatioAtTick(lowerTick)
-    );
-    (uint256 higherAmount0, ) = Utils.getAmounts(
-      uint128(LP(lpToken).balanceOf(owner())),
-      TickMath.getSqrtRatioAtTick(upperTick)
-    );
-    amount0 = lowerAmount0.sub(higherAmount0);
-    amount1 = 0;
-  }
-
-  function tokenAmountsAtUpperLimit() external view returns (uint256 amount0, uint256 amount1) {
-    (, uint256 lowerAmount1) = Utils.getAmounts(
-      uint128(LP(lpToken).balanceOf(owner())),
-      TickMath.getSqrtRatioAtTick(lowerTick)
-    );
-    (, uint256 higherAmount1) = Utils.getAmounts(
-      uint128(LP(lpToken).balanceOf(owner())),
-      TickMath.getSqrtRatioAtTick(upperTick)
-    );
-    amount0 = 0;
-    amount1 = higherAmount1.sub(lowerAmount1);
   }
 
   function averagePriceAtLowerLimit() external view returns (uint256 price0) {

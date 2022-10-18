@@ -224,19 +224,12 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint256 receivedB;
 
     receivedB = swap(tokenA, tokenB, fee, amountA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
-    receivedB = swap(tokenA, tokenB, fee, receivedA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
-    receivedB = swap(tokenA, tokenB, fee, receivedA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
-    receivedB = swap(tokenA, tokenB, fee, receivedA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
-    receivedB = swap(tokenA, tokenB, fee, receivedA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
-    receivedB = swap(tokenA, tokenB, fee, receivedA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
-    receivedB = swap(tokenA, tokenB, fee, receivedA);
-    receivedA = swap(tokenB, tokenA, fee, receivedB);
+
+    uint256 times = 10;
+    for (uint256 i = 0; i < times; i++) {
+      receivedA = swap(tokenB, tokenA, fee, receivedB);
+      receivedB = swap(tokenA, tokenB, fee, receivedA);
+    }
   }
 
   function swap(
@@ -269,7 +262,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     address from,
     uint256 id,
     bytes calldata data
-  ) external override returns (bytes4) {
+  ) external view override returns (bytes4) {
     operator;
     from;
     id;
