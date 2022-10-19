@@ -10,6 +10,7 @@ import '@openzeppelin/contracts/math/SafeMath.sol';
 
 import '../src/libraries/Lens.sol';
 
+import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
 import '../src/DepositRatioCalculator.sol';
 import '../src/logs/Logs.sol';
@@ -23,6 +24,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using SafeERC20 for ERC20;
   using Lens for RangePool;
 
+  RangePoolFactory public rangePoolFactory;
   RangePool public rangePool;
   address public tokenA;
   address public tokenB;
@@ -56,6 +58,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function testMainnet() public {
+    testRangePoolFactory();
     initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
     addLiquidity(20_000_000000, 5 ether, 1_00);
     increaseLiquidity(4_000_000000, 1 ether, 1_00);
@@ -72,6 +75,16 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   function testPoolConstruct() internal {
     rangePool = new RangePool(MAIN_USDC, MAIN_WETH, 500, 0.01 ether, 0.005 ether);
     logLimits(rangePool);
+  }
+
+  function testRangePoolFactory() internal {
+    bytes32 salt = bytes32(keccak256(abi.encodePacked('salt')));
+    rangePoolFactory = new RangePoolFactory(salt);
+    address rp = rangePoolFactory.deployRangePool(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
+    address predicted = predictAddress(salt, address(rangePoolFactory), tokenA, tokenB, fee, lowerLimitB, upperLimitB);
+    console.logAddress(predicted);
+    console.logAddress(rp);
+    assertTrue(rp == predicted);
   }
 
   function initialize(
@@ -271,6 +284,37 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     });
 
     amountOut = router.exactInputSingle(params);
+  }
+
+  function predictAddress(
+    bytes32 salt,
+    address _deployer,
+    address _tokenA,
+    address _tokenB,
+    uint24 _fee,
+    uint256 _lowerLimitInTokenB,
+    uint256 _upperLimitInTokenB
+  ) internal pure returns (address) {
+    address predictedAddress = address(
+      uint160(
+        uint256(
+          keccak256(
+            abi.encodePacked(
+              bytes1(0xff),
+              address(_deployer),
+              salt,
+              keccak256(
+                abi.encodePacked(
+                  type(RangePool).creationCode,
+                  abi.encode(_tokenA, _tokenB, _fee, _lowerLimitInTokenB, _upperLimitInTokenB)
+                )
+              )
+            )
+          )
+        )
+      )
+    );
+    return predictedAddress;
   }
 
   function onERC721Received(
