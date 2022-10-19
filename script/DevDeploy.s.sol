@@ -6,6 +6,7 @@ import 'forge-std/console2.sol';
 
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 
+import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
 
 contract Deploy is Script {
@@ -60,11 +61,14 @@ contract Deploy is Script {
     vm.startBroadcast();
     outputStart();
 
-    RangePool pool1 = new RangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000));
-    outputProp('Pool1', vm.toString(address(pool1)));
+    RangePoolFactory rpf = new RangePoolFactory();
+    RangePool pool1 = RangePool(rpf.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000)));
 
-    RangePool pool2 = new RangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000));
-    outputProp('Pool2', vm.toString(address(pool2)));
+    // RangePool pool1 = new RangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000));
+    // outputProp('Pool1', vm.toString(address(pool1)));
+    //
+    // RangePool pool2 = new RangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000));
+    // outputProp('Pool2', vm.toString(address(pool2)));
 
     outputEnd();
     vm.stopBroadcast();

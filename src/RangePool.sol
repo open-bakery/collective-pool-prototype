@@ -74,38 +74,6 @@ contract RangePool is Ownable {
     (lowerTick, upperTick) = Utils.validateAndConvertLimits(pool, _tokenB, _lowerLimitInTokenB, _upperLimitInTokenB);
   }
 
-  function lowerLimit() external view returns (uint256) {
-    return _lowerLimit();
-  }
-
-  function upperLimit() external view returns (uint256) {
-    return _upperLimit();
-  }
-
-  function averagePriceAtLowerLimit() external view returns (uint256 price0) {
-    price0 = _getAveragePriceAtLowerLimit();
-  }
-
-  function averagePriceAtUpperLimit() external view returns (uint256 price1) {
-    price1 = _getAveragePriceAtUpperLimit();
-  }
-
-  function calculateDepositRatio(uint256 amount0, uint256 amount1)
-    external
-    view
-    returns (uint256 amountRatioed0, uint256 amountRatioed1)
-  {
-    (amountRatioed0, amountRatioed1) = pool.sqrtPriceX96().calculateRatio(
-      pool.liquidity(),
-      amount0,
-      amount1,
-      lowerTick,
-      upperTick,
-      ERC20(token0).decimals(),
-      Lens.resolution
-    );
-  }
-
   function addLiquidity(
     uint256 amount0,
     uint256 amount1,
@@ -468,21 +436,5 @@ contract RangePool is Ownable {
 
     assert(ERC20(token0).balanceOf(address(this)) >= amount0);
     assert(ERC20(token1).balanceOf(address(this)) >= amount1);
-  }
-
-  function _getAveragePriceAtLowerLimit() internal view returns (uint256 _price0) {
-    _price0 = Utils.priceToken0(_getAveragePriceAtUpperLimit(), ERC20(token0).decimals(), ERC20(token1).decimals());
-  }
-
-  function _getAveragePriceAtUpperLimit() internal view returns (uint256 _price1) {
-    _price1 = Math.sqrt(_lowerLimit().mul(_upperLimit()));
-  }
-
-  function _lowerLimit() internal view returns (uint256) {
-    return Utils.convertTickToPriceUint(lowerTick, ERC20(token0).decimals());
-  }
-
-  function _upperLimit() internal view returns (uint256) {
-    return Utils.convertTickToPriceUint(upperTick, ERC20(token0).decimals());
   }
 }

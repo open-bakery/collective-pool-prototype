@@ -18,6 +18,10 @@ library Utils {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
+  function tickToPriceUint(int24 tick, uint8 decimalsToken0) external pure returns (uint256) {
+    return convertTickToPriceUint(tick, decimalsToken0);
+  }
+
   function priceToken0(
     uint256 priceToken1,
     uint8 decimalsToken0,
@@ -63,7 +67,7 @@ library Utils {
     (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
   }
 
-  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0) external pure returns (uint256) {
+  function convertTickToPriceUint(int24 tick, uint8 decimalsToken0) public pure returns (uint256) {
     return Conversions.sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
   }
 
