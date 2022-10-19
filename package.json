@@ -7,7 +7,7 @@
   "author": "0xnavigator.eth <0xnavigator@proton.me>",
   "license": "MIT",
   "scripts": {
-    "dev": "concurrently --kill-others --names 'NODE,DEPL' --prefix '({name})' --prefix-colors 'yellow.bold,cyan.bold' 'yarn start' 'wait-on -c wait-on.config.js && yarn deploy:local'",
+    "dev": "concurrently --names 'NODE,DEPL' --prefix '({name})' --prefix-colors 'yellow.bold,cyan.bold' 'yarn start' 'wait-on -c wait-on.config.js && yarn deploy:local'",
     "deploy:local": "./deploy-local.sh",
     "start": "./start.sh"
   },
