@@ -33,6 +33,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   uint256 public upperLimitB;
 
   function setUp() public {
+    rangePoolFactory = new RangePoolFactory();
     tokenA = MAIN_USDC;
     tokenB = MAIN_WETH;
     fee = 500;
@@ -58,7 +59,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function testMainnet() public {
-    testRangePoolFactory();
     initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
     addLiquidity(20_000_000000, 5 ether, 1_00);
     increaseLiquidity(4_000_000000, 1 ether, 1_00);
@@ -77,16 +77,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     logLimits(rangePool);
   }
 
-  function testRangePoolFactory() internal {
-    bytes32 salt = bytes32(keccak256(abi.encodePacked('salt')));
-    rangePoolFactory = new RangePoolFactory(salt);
-    address rp = rangePoolFactory.deployRangePool(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
-    address predicted = predictAddress(salt, address(rangePoolFactory), tokenA, tokenB, fee, lowerLimitB, upperLimitB);
-    console.logAddress(predicted);
-    console.logAddress(rp);
-    assertTrue(rp == predicted);
-  }
-
   function initialize(
     address _token0,
     address _token1,
@@ -94,7 +84,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint256 _lowerLimit,
     uint256 _upperLimit
   ) internal {
-    rangePool = new RangePool(_token0, _token1, _fee, _lowerLimit, _upperLimit);
+    rangePool = RangePool(rangePoolFactory.deployRangePool(_token0, _token1, _fee, _lowerLimit, _upperLimit));
     ERC20(_token0).approve(address(rangePool), type(uint256).max);
     ERC20(_token1).approve(address(rangePool), type(uint256).max);
   }
@@ -287,7 +277,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function predictAddress(
-    bytes32 salt,
+    string memory salt,
     address _deployer,
     address _tokenA,
     address _tokenB,
@@ -302,7 +292,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
             abi.encodePacked(
               bytes1(0xff),
               address(_deployer),
-              salt,
+              keccak256(abi.encode(salt)),
               keccak256(
                 abi.encodePacked(
                   type(RangePool).creationCode,

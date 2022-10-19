@@ -9,9 +9,7 @@ contract RangePoolFactory {
 
   bytes32 public salt;
 
-  constructor(bytes32 _salt) {
-    salt = _salt;
-  }
+  constructor() {}
 
   function deployRangePool(
     address _tokenA,
@@ -20,7 +18,8 @@ contract RangePoolFactory {
     uint256 _lowerLimitInTokenB,
     uint256 _upperLimitInTokenB
   ) external returns (address) {
-    RangePool rangePool = new RangePool{ salt: salt }(_tokenA, _tokenB, _fee, _lowerLimitInTokenB, _upperLimitInTokenB);
+    RangePool rangePool = new RangePool(_tokenA, _tokenB, _fee, _lowerLimitInTokenB, _upperLimitInTokenB);
+    rangePool.transferOwnership(msg.sender);
 
     emit RangePoolDeployed(msg.sender, address(rangePool));
 
