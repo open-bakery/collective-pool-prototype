@@ -10,6 +10,7 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
+import './Conversion.sol';
 import './Helper.sol';
 
 library Swapper {
@@ -36,13 +37,13 @@ library Swapper {
     ERC20(params.tokenIn).safeApprove(router, params.amountIn);
 
     uint256 expectedAmountOut = params.tokenOut == swapPool.token0()
-      ? Helper.convert1ToToken0(
-        Helper.oracleSqrtPricex96(swapPool, params.oracleSeconds),
+      ? Conversion.convert1ToToken0(
+        Conversion.oracleSqrtPricex96(swapPool, params.oracleSeconds),
         params.amountIn,
         ERC20(swapPool.token0()).decimals()
       )
-      : Helper.convert0ToToken1(
-        Helper.oracleSqrtPricex96(swapPool, params.oracleSeconds),
+      : Conversion.convert0ToToken1(
+        Conversion.oracleSqrtPricex96(swapPool, params.oracleSeconds),
         params.amountIn,
         ERC20(swapPool.token0()).decimals()
       );
@@ -50,8 +51,8 @@ library Swapper {
     uint256 amountOutMinimum = Helper.applySlippageTolerance(false, expectedAmountOut, params.slippage);
 
     uint160 sqrtPriceLimitX96 = params.tokenIn == swapPool.token1()
-      ? uint160(Helper.applySlippageTolerance(true, uint256(Helper.sqrtPriceX96(swapPool)), params.slippage))
-      : uint160(Helper.applySlippageTolerance(false, uint256(Helper.sqrtPriceX96(swapPool)), params.slippage));
+      ? uint160(Helper.applySlippageTolerance(true, uint256(Conversion.sqrtPriceX96(swapPool)), params.slippage))
+      : uint160(Helper.applySlippageTolerance(false, uint256(Conversion.sqrtPriceX96(swapPool)), params.slippage));
 
     amountOut = ISwapRouter(router).exactInputSingle(
       ISwapRouter.ExactInputSingleParams({

@@ -9,7 +9,9 @@ import '@openzeppelin/contracts/math/SafeMath.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
+import './libraries/Conversion.sol';
 import './libraries/Helper.sol';
+import './libraries/RatioCalculator.sol';
 
 contract DepositRatioCalculator {
   using SafeMath for uint256;
@@ -47,15 +49,15 @@ contract DepositRatioCalculator {
       (amount0, amount1) = (amountB, amountA);
     }
 
-    (int24 lowerTick, int24 upperTick) = Helper.convertLimitsToTicks(
+    (int24 lowerTick, int24 upperTick) = Conversion.convertLimitsToTicks(
       lowerLimitInTokenB,
       upperLimitInTokenB,
       pool.tickSpacing(),
       ERC20(token0).decimals()
     );
 
-    (amount0Ratioed, amount1Ratioed) = Helper.calculateRatio(
-      Helper.sqrtPriceX96(pool),
+    (amount0Ratioed, amount1Ratioed) = RatioCalculator.calculateRatio(
+      Conversion.sqrtPriceX96(pool),
       pool.liquidity(),
       amount0,
       amount1,
