@@ -8,7 +8,7 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
-import '../src/libraries/Lens.sol';
+import '../src/Lens.sol';
 
 import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
@@ -22,8 +22,9 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using stdStorage for StdStorage;
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
-  using Lens for RangePool;
 
+  address public uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
+  address public positionManager = vm.envAddress('UNISWAP_V3_NFPM');
   RangePoolFactory public rangePoolFactory;
   RangePool public rangePool;
   address public tokenA;
@@ -33,7 +34,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   uint256 public upperLimitB;
 
   function setUp() public {
-    rangePoolFactory = new RangePoolFactory();
+    rangePoolFactory = new RangePoolFactory(uniFactory, positionManager);
     tokenA = MAIN_USDC;
     tokenB = MAIN_WETH;
     fee = 500;
@@ -73,7 +74,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function testPoolConstruct() internal {
-    rangePool = new RangePool(MAIN_USDC, MAIN_WETH, 500, 0.01 ether, 0.005 ether);
+    initialize(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     logLimits(rangePool);
   }
 
@@ -94,8 +95,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint256 amount1,
     uint16 slippage
   ) internal {
-    deal(rangePool.token0(), address(this), amount0);
-    deal(rangePool.token1(), address(this), amount1);
+    deal(rangePool.pool().token0(), address(this), amount0);
+    deal(rangePool.pool().token1(), address(this), amount1);
 
     (uint128 liquidityAdded, uint256 amount0Added, uint256 amount1Added) = rangePool.addLiquidity(
       amount0,
@@ -118,8 +119,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint256 amount1,
     uint16 slippage
   ) internal {
-    deal(rangePool.token0(), address(this), amount0);
-    deal(rangePool.token1(), address(this), amount1);
+    deal(rangePool.pool().token0(), address(this), amount0);
+    deal(rangePool.pool().token1(), address(this), amount1);
 
     (uint256 ibLPTokenLP, , ) = intialBalances();
 
@@ -151,8 +152,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     );
 
     assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == ibTokenLP.sub(uint256(liquidity)));
-    assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == ibToken0.add(amountDecreased0));
-    assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == ibToken1.add(amountDecreased1));
+    assertTrue(ERC20(rangePool.pool().token0()).balanceOf(address(this)) == ibToken0.add(amountDecreased0));
+    assertTrue(ERC20(rangePool.pool().token1()).balanceOf(address(this)) == ibToken1.add(amountDecreased1));
   }
 
   function collectFees() internal {
@@ -165,8 +166,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       [uint256(amountCollected0), amountCollected1, 0, 0, 0, 0]
     );
 
-    assertTrue(ERC20(rangePool.token0()).balanceOf(address(this)) == ibToken0.add(amountCollected0));
-    assertTrue(ERC20(rangePool.token1()).balanceOf(address(this)) == ibToken1.add(amountCollected1));
+    assertTrue(ERC20(rangePool.pool().token0()).balanceOf(address(this)) == ibToken0.add(amountCollected0));
+    assertTrue(ERC20(rangePool.pool().token1()).balanceOf(address(this)) == ibToken1.add(amountCollected1));
   }
 
   function compound(uint16 slippage) internal {
@@ -184,7 +185,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   function dca(address token, uint16 slippage) internal {
     (, uint256 ibToken0, uint256 ibToken1) = intialBalances();
-    uint256 initialBalance = (token == rangePool.token0()) ? ibToken0 : ibToken1;
+    uint256 initialBalance = (token == rangePool.pool().token0()) ? ibToken0 : ibToken1;
     uint256 amount = rangePool.dca(token, slippage);
 
     logr('dca()', ['amount', '0', '0', '0', '0', '0'], [uint256(amount), 0, 0, 0, 0, 0]);
@@ -206,8 +207,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       slippage
     );
 
-    uint256 newLowerLimit = rangePool.lowerLimit();
-    uint256 newUpperLimit = rangePool.upperLimit();
+    uint256 newLowerLimit = lens.lowerLimit(rangePool);
+    uint256 newUpperLimit = lens.upperLimit(rangePool);
 
     logr(
       'updateRange()',
@@ -226,8 +227,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     )
   {
     amountLP = ERC20(rangePool.lpToken()).balanceOf(address(this));
-    amount0 = ERC20(rangePool.token0()).balanceOf(address(this));
-    amount1 = ERC20(rangePool.token1()).balanceOf(address(this));
+    amount0 = ERC20(rangePool.pool().token0()).balanceOf(address(this));
+    amount1 = ERC20(rangePool.pool().token1()).balanceOf(address(this));
   }
 
   function performSwaps(

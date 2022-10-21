@@ -2,55 +2,68 @@
 pragma solidity >=0.5.0 <0.8.14;
 pragma abicoder v2;
 
+import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
+import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+
+import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
+import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
+
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import './Utils.sol';
-import './RatioCalculator.sol';
-import './PoolUtils.sol';
+
+import './Helper.sol';
 
 library Swapper {
-  using RatioCalculator for uint160;
-  using PoolUtils for IUniswapV3Pool;
-  using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
   address constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
   address constant router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-  function swap(
-    address recipient,
-    address tokenIn,
-    address tokenOut,
-    uint24 fee,
-    uint256 amountIn,
-    uint16 slippage,
-    uint32 oracleSeconds,
-    uint16 resolution
-  ) external returns (uint256 amountOut) {
-    IUniswapV3Pool swapPool = IUniswapV3Pool(Utils.getPoolAddress(tokenIn, tokenOut, fee, uniswapFactory));
+  struct SwapParameters {
+    address recipient;
+    address tokenIn;
+    address tokenOut;
+    uint24 fee;
+    uint256 amountIn;
+    uint16 slippage;
+    uint32 oracleSeconds;
+  }
 
-    ERC20(tokenIn).safeApprove(router, amountIn);
+  function swap(SwapParameters memory params) internal returns (uint256 amountOut) {
+    IUniswapV3Pool swapPool = IUniswapV3Pool(
+      IUniswapV3Factory(uniswapFactory).getPool(params.tokenIn, params.tokenOut, params.fee)
+    );
 
-    uint256 expectedAmountOut = tokenOut == swapPool.token0()
-      ? swapPool.oracleSqrtPricex96(oracleSeconds).convert1ToToken0(amountIn, ERC20(swapPool.token0()).decimals())
-      : swapPool.oracleSqrtPricex96(oracleSeconds).convert0ToToken1(amountIn, ERC20(swapPool.token0()).decimals());
+    ERC20(params.tokenIn).safeApprove(router, params.amountIn);
 
-    uint256 amountOutMinimum = Utils.applySlippageTolerance(false, expectedAmountOut, slippage, resolution);
+    uint256 expectedAmountOut = params.tokenOut == swapPool.token0()
+      ? Helper.convert1ToToken0(
+        Helper.oracleSqrtPricex96(swapPool, params.oracleSeconds),
+        params.amountIn,
+        ERC20(swapPool.token0()).decimals()
+      )
+      : Helper.convert0ToToken1(
+        Helper.oracleSqrtPricex96(swapPool, params.oracleSeconds),
+        params.amountIn,
+        ERC20(swapPool.token0()).decimals()
+      );
 
-    uint160 sqrtPriceLimitX96 = tokenIn == swapPool.token1()
-      ? uint160(Utils.applySlippageTolerance(true, uint256(swapPool.sqrtPriceX96()), slippage, resolution))
-      : uint160(Utils.applySlippageTolerance(false, uint256(swapPool.sqrtPriceX96()), slippage, resolution));
+    uint256 amountOutMinimum = Helper.applySlippageTolerance(false, expectedAmountOut, params.slippage);
 
-    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,
-      fee: fee,
-      recipient: recipient,
-      deadline: block.timestamp,
-      amountIn: amountIn,
-      amountOutMinimum: amountOutMinimum,
-      sqrtPriceLimitX96: sqrtPriceLimitX96
-    });
+    uint160 sqrtPriceLimitX96 = params.tokenIn == swapPool.token1()
+      ? uint160(Helper.applySlippageTolerance(true, uint256(Helper.sqrtPriceX96(swapPool)), params.slippage))
+      : uint160(Helper.applySlippageTolerance(false, uint256(Helper.sqrtPriceX96(swapPool)), params.slippage));
 
-    amountOut = ISwapRouter(router).exactInputSingle(params);
+    amountOut = ISwapRouter(router).exactInputSingle(
+      ISwapRouter.ExactInputSingleParams({
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        fee: params.fee,
+        recipient: params.recipient,
+        deadline: block.timestamp,
+        amountIn: params.amountIn,
+        amountOutMinimum: amountOutMinimum,
+        sqrtPriceLimitX96: sqrtPriceLimitX96
+      })
+    );
   }
 }

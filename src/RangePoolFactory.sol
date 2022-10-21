@@ -1,19 +1,31 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.5.0 <0.8.0;
+pragma abicoder v2;
+
+import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 
 import './RangePool.sol';
 
 contract RangePoolFactory {
+  INonfungiblePositionManager public immutable positionManager;
+  IUniswapV3Factory public immutable uniFactory;
+
   event RangePoolDeployed(address indexed deployer, address indexed rangePool);
 
+  constructor(address uniswapFactory, address nonfungiblePositionManager) {
+    positionManager = INonfungiblePositionManager(nonfungiblePositionManager);
+    uniFactory = IUniswapV3Factory(uniswapFactory);
+  }
+
   function deployRangePool(
-    address _tokenA,
-    address _tokenB,
-    uint24 _fee,
-    uint256 _lowerLimitInTokenB,
-    uint256 _upperLimitInTokenB
+    address tokenA,
+    address tokenB,
+    uint24 fee,
+    uint256 lowerLimitInTokenB,
+    uint256 upperLimitInTokenB
   ) external returns (address) {
-    RangePool rangePool = new RangePool(_tokenA, _tokenB, _fee, _lowerLimitInTokenB, _upperLimitInTokenB);
+    RangePool rangePool = new RangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
     rangePool.transferOwnership(msg.sender);
 
     emit RangePoolDeployed(msg.sender, address(rangePool));

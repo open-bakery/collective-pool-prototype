@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.7.0 <0.9.0;
+pragma abicoder v2;
 
 import 'forge-std/Script.sol';
 import 'forge-std/console2.sol';
@@ -10,6 +11,9 @@ import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
 
 contract Deploy is Script {
+  address uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
+  address positionManager = vm.envAddress('UNISWAP_V3_NFPM');
+
   address WETH = vm.envAddress('WETH');
   address USDC = vm.envAddress('USDC');
   string DEPLOY_OUT = vm.envString('DEPLOY_OUT');
@@ -60,15 +64,13 @@ contract Deploy is Script {
   function run() external {
     vm.startBroadcast();
     outputStart();
+    RangePoolFactory rpf = new RangePoolFactory(uniFactory, positionManager);
 
-    RangePoolFactory rpf = new RangePoolFactory();
     RangePool pool1 = RangePool(rpf.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000)));
+    outputProp('Pool1', vm.toString(address(pool1)));
 
-    // RangePool pool1 = new RangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000));
-    // outputProp('Pool1', vm.toString(address(pool1)));
-    //
-    // RangePool pool2 = new RangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000));
-    // outputProp('Pool2', vm.toString(address(pool2)));
+    RangePool pool2 = RangePool(rpf.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000)));
+    outputProp('Pool2', vm.toString(address(pool2)));
 
     outputEnd();
     vm.stopBroadcast();

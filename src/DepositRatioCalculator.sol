@@ -6,17 +6,14 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
+import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
-import './libraries/Utils.sol';
-import './libraries/PoolUtils.sol';
-import './libraries/RatioCalculator.sol';
+import './libraries/Helper.sol';
 
 contract DepositRatioCalculator {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
-  using RatioCalculator for uint160;
-  using PoolUtils for IUniswapV3Pool;
 
   address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
 
@@ -38,33 +35,33 @@ contract DepositRatioCalculator {
       : (upperLimitInTokenB, lowerLimitInTokenB);
     if (lowerLimitInTokenB == 0) lowerLimitInTokenB = 1;
 
-    address pool = Utils.getPoolAddress(tokenA, tokenB, fee, uniswapFactory);
-    (address token0, address token1) = Utils.orderTokens(tokenA, tokenB);
+    IUniswapV3Pool pool = IUniswapV3Pool(IUniswapV3Factory(uniswapFactory).getPool(tokenA, tokenB, fee));
+    (address token0, address token1) = (pool.token0(), pool.token1());
 
     uint256 amount0 = amountA;
     uint256 amount1 = amountB;
 
     if (tokenA != token0) {
-      lowerLimitInTokenB = Utils.priceToken0(lowerLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
-      upperLimitInTokenB = Utils.priceToken0(upperLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
+      lowerLimitInTokenB = Helper.priceToken0(lowerLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
+      upperLimitInTokenB = Helper.priceToken0(upperLimitInTokenB, ERC20(token0).decimals(), ERC20(token1).decimals());
       (amount0, amount1) = (amountB, amountA);
     }
 
-    (int24 lowerTick, int24 upperTick) = Utils.convertLimitsToTicks(
+    (int24 lowerTick, int24 upperTick) = Helper.convertLimitsToTicks(
       lowerLimitInTokenB,
       upperLimitInTokenB,
-      IUniswapV3Pool(pool).tickSpacing(),
+      pool.tickSpacing(),
       ERC20(token0).decimals()
     );
 
-    (amount0Ratioed, amount1Ratioed) = IUniswapV3Pool(pool).sqrtPriceX96().calculateRatio(
-      IUniswapV3Pool(pool).liquidity(),
+    (amount0Ratioed, amount1Ratioed) = Helper.calculateRatio(
+      Helper.sqrtPriceX96(pool),
+      pool.liquidity(),
       amount0,
       amount1,
       lowerTick,
       upperTick,
-      ERC20(token0).decimals(),
-      10_000
+      ERC20(token0).decimals()
     );
   }
 }
