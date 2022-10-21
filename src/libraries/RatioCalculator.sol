@@ -8,6 +8,7 @@ import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 import './Conversion.sol';
+import './Helper.sol';
 
 library RatioCalculator {
   using SafeMath for uint256;

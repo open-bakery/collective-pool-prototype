@@ -9,6 +9,7 @@ import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
 
 import '../src/Lens.sol';
+import '../src/SimpleStrategies.sol';
 
 import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
@@ -26,6 +27,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   address public uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
   address public positionManager = vm.envAddress('UNISWAP_V3_NFPM');
   RangePoolFactory public rangePoolFactory;
+  SimpleStrategies public simpleStrategies;
   RangePool public rangePool;
   address public tokenA;
   address public tokenB;
@@ -35,6 +37,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   function setUp() public {
     rangePoolFactory = new RangePoolFactory(uniFactory, positionManager);
+    simpleStrategies = new SimpleStrategies();
     tokenA = MAIN_USDC;
     tokenB = MAIN_WETH;
     fee = 500;
@@ -69,7 +72,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     compound(1_00);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
-    dca(tokenA, 1_00);
+    stack(tokenA, 1_00);
     updateRange(MAIN_USDC, 1200_000000, 1800_000000, 1_00);
   }
 
@@ -86,6 +89,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint256 _upperLimit
   ) internal {
     rangePool = RangePool(rangePoolFactory.deployRangePool(_token0, _token1, _fee, _lowerLimit, _upperLimit));
+    rangePool.toggleStrategy(address(simpleStrategies));
     ERC20(_token0).approve(address(rangePool), type(uint256).max);
     ERC20(_token1).approve(address(rangePool), type(uint256).max);
   }
@@ -172,7 +176,10 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   function compound(uint16 slippage) internal {
     (uint256 ibTokenLP, , ) = intialBalances();
-    (uint128 addedLiquidity, uint256 amountCompounded0, uint256 amountCompounded1) = rangePool.compound(slippage);
+    (uint128 addedLiquidity, uint256 amountCompounded0, uint256 amountCompounded1) = simpleStrategies.compound(
+      rangePool,
+      slippage
+    );
 
     logr(
       'compound()',
@@ -183,12 +190,12 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     assertTrue(ERC20(rangePool.lpToken()).balanceOf(address(this)) == ibTokenLP.add(addedLiquidity));
   }
 
-  function dca(address token, uint16 slippage) internal {
+  function stack(address token, uint16 slippage) internal {
     (, uint256 ibToken0, uint256 ibToken1) = intialBalances();
     uint256 initialBalance = (token == rangePool.pool().token0()) ? ibToken0 : ibToken1;
-    uint256 amount = rangePool.dca(token, slippage);
+    uint256 amount = simpleStrategies.stack(rangePool, token, slippage);
 
-    logr('dca()', ['amount', '0', '0', '0', '0', '0'], [uint256(amount), 0, 0, 0, 0, 0]);
+    logr('stack()', ['amount', '0', '0', '0', '0', '0'], [uint256(amount), 0, 0, 0, 0, 0]);
 
     assertTrue(amount > 0);
     assertTrue(ERC20(token).balanceOf(address(this)) == initialBalance.add(amount));

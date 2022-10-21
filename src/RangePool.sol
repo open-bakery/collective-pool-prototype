@@ -13,7 +13,6 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 
 import './libraries/Helper.sol';
-import './libraries/Swapper.sol';
 
 import './RangePoolFactory.sol';
 import './LiquidityProviderToken.sol';
@@ -37,10 +36,17 @@ contract RangePool is Ownable {
   uint256 public totalClaimedFees0;
   uint256 public totalClaimedFees1;
 
+  mapping(address => bool) public isRegistered;
+
   event LiquidityIncreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
   event DCA(address indexed recipient, uint256 amount);
+
+  modifier onlyAllowed() {
+    require(msg.sender == owner() || isRegistered[msg.sender] == true, 'RangePool:NA'); // Caller not alloed
+    _;
+  }
 
   constructor(
     address _tokenA,
@@ -58,13 +64,17 @@ contract RangePool is Ownable {
     ERC20(pool.token1()).safeApprove(address(rangePoolFactory.positionManager()), type(uint256).max);
   }
 
+  function toggleStrategy(address strategy) external onlyOwner {
+    isRegistered[strategy] = !isRegistered[strategy];
+  }
+
   function addLiquidity(
     uint256 amount0,
     uint256 amount1,
     uint16 slippage
   )
     external
-    onlyOwner
+    onlyAllowed
     returns (
       uint128 liquidityAdded,
       uint256 amountAdded0,
@@ -102,59 +112,8 @@ contract RangePool is Ownable {
     rangePoolFactory.positionManager().safeTransferFrom(address(this), msg.sender, tokenId);
   }
 
-  function collectFees() external onlyOwner returns (uint256 amountCollected0, uint256 amountCollected1) {
+  function collectFees() external onlyAllowed returns (uint256 amountCollected0, uint256 amountCollected1) {
     (amountCollected0, amountCollected1) = _collectFees(msg.sender);
-  }
-
-  function compound(uint16 slippage)
-    external
-    onlyOwner
-    returns (
-      uint128 addedLiquidity,
-      uint256 amountCompounded0,
-      uint256 amountCompounded1
-    )
-  {
-    (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
-    (addedLiquidity, amountCompounded0, amountCompounded1) = _addLiquidity(
-      msg.sender,
-      amountCollected0,
-      amountCollected1,
-      slippage
-    );
-  }
-
-  function dca(address tokenOut, uint16 slippage) public returns (uint256 amountSent) {
-    address token0 = pool.token0();
-    address token1 = pool.token1();
-
-    require(
-      tokenOut == token0 || tokenOut == token1,
-      'RangePool:NA' //  Can only DCA into a token belonging to this pool
-    );
-
-    (uint256 amountCollected0, uint256 amountCollected1) = _collectFees(address(this));
-
-    address tokenIn = (tokenOut == token0) ? token1 : token0;
-    (uint256 amountIn, uint256 amountCollected) = (tokenIn == token0)
-      ? (amountCollected0, amountCollected1)
-      : (amountCollected1, amountCollected0);
-
-    uint256 amountAcquired = Helper.swap(
-      Swapper.SwapParameters({
-        recipient: address(this),
-        tokenIn: tokenIn,
-        tokenOut: tokenOut,
-        fee: pool.fee(),
-        amountIn: amountIn,
-        slippage: slippage,
-        oracleSeconds: oracleSeconds
-      })
-    );
-
-    amountSent = Helper.safeBalanceTransfer(tokenOut, address(this), msg.sender, amountAcquired.add(amountCollected));
-
-    emit DCA(msg.sender, amountSent);
   }
 
   function updateRange(
