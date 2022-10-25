@@ -9,6 +9,7 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 
 import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
+import '../src/Lens.sol';
 
 contract Deploy is Script {
   address uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
@@ -64,13 +65,17 @@ contract Deploy is Script {
   function run() external {
     vm.startBroadcast();
     outputStart();
-    RangePoolFactory rpf = new RangePoolFactory(uniFactory, positionManager);
 
-    RangePool pool1 = RangePool(rpf.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000)));
-    outputProp('Pool1', vm.toString(address(pool1)));
+    RangePoolFactory factory = new RangePoolFactory(uniFactory, positionManager);
+    outputProp('factory', vm.toString(address(factory)));
+    outputProp('lens', vm.toString(address(new Lens())));
 
-    RangePool pool2 = RangePool(rpf.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000)));
-    outputProp('Pool2', vm.toString(address(pool2)));
+    address pool1 = factory.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(1000), usdcAmount(2000));
+    outputProp('pool1', vm.toString(pool1));
+
+    address pool2 = factory.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000));
+    outputProp('pool2', vm.toString(pool2));
+    outputProp('startBlock', vm.toString(block.number));
 
     outputEnd();
     vm.stopBroadcast();
