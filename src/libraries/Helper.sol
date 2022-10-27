@@ -45,7 +45,7 @@ library Helper {
 
   function convertToRatio(ConvertRatioParams memory params)
     external
-    returns (uint256 converterAmount0, uint256 convertedAmount1)
+    returns (uint256 convertedAmount0, uint256 convertedAmount1)
   {
     (uint256 targetAmount0, uint256 targetAmount1) = RatioCalculator.calculateRatio(
       Conversion.sqrtPriceX96(params.rangePool.pool()),
@@ -57,17 +57,20 @@ library Helper {
       ERC20(params.rangePool.pool().token0()).decimals()
     );
 
-    converterAmount0 = params.amount0;
+    convertedAmount0 = params.amount0;
     convertedAmount1 = params.amount1;
     uint256 diff;
 
     diff = (params.amount0 > targetAmount0) ? params.amount0.sub(targetAmount0) : params.amount1.sub(targetAmount1);
+    (address _tokenIn, address _tokenOut) = (params.amount0 > targetAmount0)
+      ? (params.rangePool.pool().token0(), params.rangePool.pool().token1())
+      : (params.rangePool.pool().token1(), params.rangePool.pool().token0());
 
     uint256 swaped = Swapper.swap(
       Swapper.SwapParameters({
         recipient: params.recipient,
-        tokenIn: params.rangePool.pool().token0(),
-        tokenOut: params.rangePool.pool().token1(),
+        tokenIn: _tokenIn,
+        tokenOut: _tokenOut,
         fee: params.rangePool.pool().fee(),
         amountIn: diff,
         slippage: params.slippage,
@@ -75,11 +78,11 @@ library Helper {
       })
     );
 
-    (converterAmount0, convertedAmount1) = (params.amount0 > targetAmount0)
-      ? (converterAmount0.sub(diff), convertedAmount1.add(swaped))
-      : (converterAmount0.add(swaped), convertedAmount1.sub(diff));
+    (convertedAmount0, convertedAmount1) = (params.amount0 > targetAmount0)
+      ? (convertedAmount0.sub(diff), convertedAmount1.add(swaped))
+      : (convertedAmount0.add(swaped), convertedAmount1.sub(diff));
 
-    assert(ERC20(params.rangePool.pool().token0()).balanceOf(params.recipient) >= converterAmount0);
+    assert(ERC20(params.rangePool.pool().token0()).balanceOf(params.recipient) >= convertedAmount0);
     assert(ERC20(params.rangePool.pool().token1()).balanceOf(params.recipient) >= convertedAmount1);
   }
 

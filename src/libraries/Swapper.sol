@@ -26,8 +26,8 @@ library Swapper {
     uint32 oracleSeconds;
   }
 
-  address constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
-  address constant router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+  address public constant uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+  address public constant router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
   function swap(SwapParameters memory params) internal returns (uint256 amountOut) {
     IUniswapV3Pool swapPool = IUniswapV3Pool(
