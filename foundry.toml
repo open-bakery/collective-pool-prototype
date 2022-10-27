@@ -3,6 +3,6 @@ src = 'src'
 out = 'out'
 libs = ['lib']
 auto_detect_solc = true
-fs_permissions = [{ access = "write", path = "./out" }]
+fs_permissions = [{ access = "write", path = "./dist" }]
 gas_reports = ["RangePool", "RangePoolFactory", "Helper"]
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
