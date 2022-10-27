@@ -40,6 +40,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     simpleStrategies = new SimpleStrategies();
     tokenA = MAIN_USDC;
     tokenB = MAIN_WETH;
+    // tokenA = ARB_USDC;
+    // tokenB = ARB_WETH;
     fee = 500;
     lowerLimitB = 0.001 ether;
     upperLimitB = 0.0005 ether;
@@ -47,7 +49,20 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   function testAnvil() public returns (uint256) {}
 
-  function testArbitrum() public {}
+  function testArbitrum() public {
+    uint16 slippage = 100_00;
+    initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
+    addLiquidity(20_000_000000, 5 ether, slippage);
+    increaseLiquidity(4_000_000000, 1 ether, slippage);
+    decreaseLiquidity(uint128(ERC20(rangePool.lpToken()).balanceOf(address(this)).div(2)), slippage);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    collectFees();
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    compound(slippage);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    stack(tokenA, slippage);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
+  }
 
   function testFullLogs() public {
     initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
@@ -63,17 +78,18 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   }
 
   function testMainnet() public {
+    uint16 slippage = 1_00;
     initialize(tokenA, tokenB, fee, lowerLimitB, upperLimitB);
-    addLiquidity(20_000_000000, 5 ether, 1_00);
-    increaseLiquidity(4_000_000000, 1 ether, 1_00);
-    decreaseLiquidity(uint128(ERC20(rangePool.lpToken()).balanceOf(address(this)).div(2)), 1_00);
+    addLiquidity(20_000_000000, 5 ether, slippage);
+    increaseLiquidity(4_000_000000, 1 ether, slippage);
+    decreaseLiquidity(uint128(ERC20(rangePool.lpToken()).balanceOf(address(this)).div(2)), slippage);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     collectFees();
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
-    compound(1_00);
+    compound(slippage);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
-    stack(tokenA, 1_00);
-    updateRange(MAIN_USDC, 1200_000000, 1800_000000, 1_00);
+    stack(tokenA, slippage);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
   }
 
   function testPoolConstruct() internal {

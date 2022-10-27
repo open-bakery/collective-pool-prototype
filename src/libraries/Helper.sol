@@ -59,12 +59,10 @@ library Helper {
 
     convertedAmount0 = params.amount0;
     convertedAmount1 = params.amount1;
-    uint256 diff;
 
-    diff = (params.amount0 > targetAmount0) ? params.amount0.sub(targetAmount0) : params.amount1.sub(targetAmount1);
-    (address _tokenIn, address _tokenOut) = (params.amount0 > targetAmount0)
-      ? (params.rangePool.pool().token0(), params.rangePool.pool().token1())
-      : (params.rangePool.pool().token1(), params.rangePool.pool().token0());
+    (uint256 diff, address _tokenIn, address _tokenOut) = (params.amount0 > targetAmount0)
+      ? (params.amount0.sub(targetAmount0), params.rangePool.pool().token0(), params.rangePool.pool().token1())
+      : (params.amount1.sub(targetAmount1), params.rangePool.pool().token1(), params.rangePool.pool().token0());
 
     uint256 swaped = Swapper.swap(
       Swapper.SwapParameters({
