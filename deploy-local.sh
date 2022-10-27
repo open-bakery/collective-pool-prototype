@@ -10,6 +10,6 @@ RUST_BACKTRACE=full forge script script/DevDeploy.s.sol:Deploy --fork-url http:/
 ABIS_DIR="$BASEDIR/dist/abis"
 mkdir -p $ABIS_DIR
 
-jq .abi "$BASEDIR/out/RangePoolFactory.sol/RangePoolFactory.json" > "$ABIS_DIR/RangePoolFactory.json"
-jq .abi "$BASEDIR/out/RangePool.sol/RangePool.json" > "$ABIS_DIR/RangePool.json"
-jq .abi "$BASEDIR/out/ERC20.sol/ERC20.json" > "$ABIS_DIR/ERC20.json"
+for contract in RangePoolFactory RangePool ERC20 IUniswapV3Pool; do
+  jq .abi "$BASEDIR/out/$contract.sol/$contract.json" > "$ABIS_DIR/$contract.json"
+done;
