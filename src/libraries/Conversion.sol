@@ -49,10 +49,6 @@ library Conversion {
     return uint160(Math.sqrt(ratioX192));
   }
 
-  function tickToPriceUint(int24 tick, uint8 decimalsToken0) internal pure returns (uint256) {
-    return convertTickToPriceUint(tick, decimalsToken0);
-  }
-
   function convertTickToPriceUint(int24 tick, uint8 decimalsToken0) internal pure returns (uint256) {
     return sqrtPriceX96ToUint(TickMath.getSqrtRatioAtTick(tick), decimalsToken0);
   }
