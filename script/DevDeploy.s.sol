@@ -66,7 +66,7 @@ contract Deploy is Script {
     vm.startBroadcast();
     outputStart();
 
-    RangePoolFactory factory = new RangePoolFactory(uniFactory, positionManager);
+    RangePoolFactory factory = new RangePoolFactory(uniFactory, positionManager, WETH);
     outputProp('factory', vm.toString(address(factory)));
     outputProp('lens', vm.toString(address(new Lens())));
 

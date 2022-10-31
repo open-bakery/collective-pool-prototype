@@ -11,6 +11,7 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
 
 import './libraries/Helper.sol';
 
@@ -74,6 +75,7 @@ contract RangePool is Ownable {
     uint16 slippage
   )
     external
+    payable
     onlyAllowed
     returns (
       uint128 liquidityAdded,
@@ -326,5 +328,30 @@ contract RangePool is Ownable {
     totalClaimedFees1 = totalClaimedFees1.add(amountCollected1);
 
     emit FeesCollected(_recipient, amountCollected0, amountCollected1);
+  }
+
+  function _convertEth(uint256 token0Amount, uint256 token1Amount)
+    internal
+    returns (
+      uint256,
+      uint256,
+      bool
+    )
+  {
+    bool _ethUsed = false;
+    uint256 _eth = msg.value;
+    address weth = rangePoolFactory.WETH();
+    if (_eth > 0) {
+      IWETH9(weth).deposit{ value: _eth }();
+
+      if (pool.token0() == weth) {
+        token0Amount = _eth;
+        _ethUsed = true;
+      } else if (pool.token1() == weth) {
+        token1Amount = _eth;
+        _ethUsed = true;
+      }
+    }
+    return (token0Amount, token1Amount, _ethUsed);
   }
 }

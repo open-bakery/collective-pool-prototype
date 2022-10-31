@@ -12,6 +12,7 @@ import './Helper.sol';
 
 library RatioCalculator {
   using SafeMath for uint256;
+  using SafeMath for uint128;
 
   function calculateRatio(
     uint160 sqrtPriceX96,

@@ -24,4 +24,6 @@ contract LocalVars is Test {
   address public MAIN_DAI = vm.envAddress('MAIN_DAI');
   address public MAIN_FRAX = vm.envAddress('MAIN_FRAX');
   address public MAIN_APE = vm.envAddress('MAIN_APE');
+  address public WETH = vm.envAddress('WETH');
+  address public USDC = vm.envAddress('USDC');
 }

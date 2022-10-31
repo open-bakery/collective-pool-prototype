@@ -60,7 +60,9 @@ library Helper {
     convertedAmount0 = params.amount0;
     convertedAmount1 = params.amount1;
 
-    (uint256 diff, address _tokenIn, address _tokenOut) = (params.amount0 > targetAmount0)
+    bool zeroForOne = params.amount0 > targetAmount0 ? true : false;
+
+    (uint256 diff, address _tokenIn, address _tokenOut) = (zeroForOne)
       ? (params.amount0.sub(targetAmount0), params.rangePool.pool().token0(), params.rangePool.pool().token1())
       : (params.amount1.sub(targetAmount1), params.rangePool.pool().token1(), params.rangePool.pool().token0());
 
@@ -76,7 +78,7 @@ library Helper {
       })
     );
 
-    (convertedAmount0, convertedAmount1) = (params.amount0 > targetAmount0)
+    (convertedAmount0, convertedAmount1) = (zeroForOne)
       ? (convertedAmount0.sub(diff), convertedAmount1.add(swaped))
       : (convertedAmount0.add(swaped), convertedAmount1.sub(diff));
 

@@ -8,14 +8,20 @@ import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.s
 import './RangePool.sol';
 
 contract RangePoolFactory {
+  address public immutable WETH;
   INonfungiblePositionManager public immutable positionManager;
   IUniswapV3Factory public immutable uniFactory;
 
   event RangePoolDeployed(address indexed deployer, address indexed rangePool);
 
-  constructor(address uniswapFactory, address nonfungiblePositionManager) {
+  constructor(
+    address uniswapFactory,
+    address nonfungiblePositionManager,
+    address _weth
+  ) {
     positionManager = INonfungiblePositionManager(nonfungiblePositionManager);
     uniFactory = IUniswapV3Factory(uniswapFactory);
+    WETH = _weth;
   }
 
   function deployRangePool(

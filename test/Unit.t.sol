@@ -17,6 +17,7 @@ import '../src/DepositRatioCalculator.sol';
 import '../src/logs/Logs.sol';
 import './LocalVars.t.sol';
 import './Logs.t.sol';
+import './libraries/Utils.sol';
 
 contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using PositionValue for INonfungiblePositionManager;
@@ -36,10 +37,10 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   uint256 public upperLimitB;
 
   function setUp() public {
-    rangePoolFactory = new RangePoolFactory(uniFactory, positionManager);
+    rangePoolFactory = new RangePoolFactory(uniFactory, positionManager, WETH);
     simpleStrategies = new SimpleStrategies();
-    tokenA = MAIN_USDC;
-    tokenB = MAIN_WETH;
+    tokenA = USDC;
+    tokenB = WETH;
     // tokenA = ARB_USDC;
     // tokenB = ARB_WETH;
     fee = 500;
