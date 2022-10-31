@@ -15,8 +15,8 @@ contract Deploy is Script {
   address uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
   address positionManager = vm.envAddress('UNISWAP_V3_NFPM');
 
-  address WETH = vm.envAddress('WETH');
-  address USDC = vm.envAddress('USDC');
+  address WETH = vm.envAddress('ARB_WETH');
+  address USDC = vm.envAddress('ARB_USDC');
   string DEPLOY_OUT = vm.envString('DEPLOY_OUT');
 
   uint24 FEE0_05 = 500;
