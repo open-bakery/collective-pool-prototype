@@ -30,6 +30,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   RangePoolFactory public rangePoolFactory;
   SimpleStrategies public simpleStrategies;
   RangePool public rangePool;
+  //  Lens public lens; // inherited from Logs
   address public tokenA;
   address public tokenB;
   uint24 public fee;
@@ -37,7 +38,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   uint256 public upperLimitB;
 
   function setUp() public {
-    rangePoolFactory = new RangePoolFactory(uniFactory, positionManager, WETH);
+    lens = new Lens();
+    rangePoolFactory = new RangePoolFactory(uniFactory, positionManager, WETH, address(lens));
     simpleStrategies = new SimpleStrategies();
     tokenA = USDC;
     tokenB = WETH;

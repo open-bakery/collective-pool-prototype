@@ -6,22 +6,26 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 
 import './RangePool.sol';
+import './Lens.sol';
 
 contract RangePoolFactory {
-  address public immutable WETH;
   INonfungiblePositionManager public immutable positionManager;
   IUniswapV3Factory public immutable uniFactory;
+  address public immutable WETH;
+  Lens public immutable lens;
 
   event RangePoolDeployed(address indexed deployer, address indexed rangePool);
 
   constructor(
     address uniswapFactory,
     address nonfungiblePositionManager,
-    address _weth
+    address _weth,
+    address _lens
   ) {
     positionManager = INonfungiblePositionManager(nonfungiblePositionManager);
     uniFactory = IUniswapV3Factory(uniswapFactory);
     WETH = _weth;
+    lens = Lens(_lens);
   }
 
   function deployRangePool(
