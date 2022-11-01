@@ -5,24 +5,40 @@ pragma abicoder v2;
 import 'forge-std/Script.sol';
 import 'forge-std/console2.sol';
 
-import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '@uniswap/v3-core/contracts/UniswapV3Factory.sol';
+import '@uniswap/v3-periphery/contracts/NonfungiblePositionManager.sol';
+import '@uniswap/v3-periphery/contracts/NonfungibleTokenPositionDescriptor.sol';
 
 import '../src/RangePoolFactory.sol';
 import '../src/RangePool.sol';
 import '../src/Lens.sol';
+import '../src/utility/Token.sol';
 
 contract Deploy is Script {
-  address uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
-  address positionManager = vm.envAddress('UNISWAP_V3_NFPM');
+  //  address uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
+  //  address positionManager = vm.envAddress('UNISWAP_V3_NFPM');
+  //  address WETH = vm.envAddress('WETH');
+  //  address USDC = vm.envAddress('USDC');
 
-  address WETH = vm.envAddress('WETH');
-  address USDC = vm.envAddress('USDC');
+  Token WETH;
+  Token USDC;
+  Token GMX;
+  UniswapV3Factory uniFactory;
+  NonfungiblePositionManager positionManager;
+  NonfungibleTokenPositionDescriptor tokenPositionDescriptor;
+
+  UniswapV3Pool poolWethUsdc030;
+
   string NETWORK = vm.envString('NETWORK');
   string DEPLOY_OUT = vm.envString('DEPLOY_OUT');
 
   uint24 FEE0_05 = 500;
   uint24 FEE0_30 = 3000;
   uint24 FEE1_00 = 10000;
+
+  int24 TICK_SPACING_0_05 = 10;
+  int24 TICK_SPACING_0_30 = 60;
+  int24 TICK_SPACING_1_00 = 200;
 
   function setUp() public {}
 
@@ -63,9 +79,38 @@ contract Deploy is Script {
     ERC20(token).approve(address(pool), type(uint256).max);
   }
 
+  function deployTokens() private {
+    WETH = new Token('WETH', 'WETH', 18, 1_000_000 * 10**18);
+    USDC = new Token('USD Coin', 'USDC', 6, 1_000_000 * 10**6);
+    GMX = new Token('GMX', 'GMX', 18, 1_000_000 * 10**18);
+    outputProp('weth', vm.toString(address(WETH)));
+    outputProp('usdc', vm.toString(address(USDC)));
+    outputProp('gmx', vm.toString(address(GMX)));
+  }
+
+  function deployUniswap() private {
+    uniFactory = new UniswapV3Factory();
+    tokenPositionDescriptor = new NonfungibleTokenPositionDescriptor(address(WETH), vm.parseBytes('ETH'));
+    positionManager = new NonfungiblePositionManager(
+      address(uniFactory),
+      address(WETH),
+      address(tokenPositionDescriptor)
+    );
+
+    outputProp('uniFactory', vm.toString(address(uniFactory)));
+    outputProp('tokenPositionDescriptor', vm.toString(address(tokenPositionDescriptor)));
+    outputProp('positionManager', vm.toString(address(positionManager)));
+
+    poolWethUsdc030 = uniFactory.createPool(address(WETH), address(USDC), FEE0_30);
+    poolWethGmx030 = uniFactory.createPool(address(WETH), address(USDC), FEE0_30);
+  }
+
   function run() external {
     vm.startBroadcast();
     outputStart();
+
+    deployTokens();
+    deployUniswap();
 
     Lens lens = new Lens();
     outputProp('lens', vm.toString(address(lens)));
