@@ -16,8 +16,8 @@ contract ContractTest is Test, Logs, LocalVars {
   DepositRatioCalculator drc = new DepositRatioCalculator();
 
   function setUp() public {
-    balanceETH = 100 ether; // ERC20(ARB_WETH).balanceOf(wallet);
-    balanceUSDC = 10_000_000000; // ERC20(ARB_USDC).balanceOf(wallet);
+    balanceETH = 100 ether; // ERC20(WETH).balanceOf(wallet);
+    balanceUSDC = 10_000_000000; // ERC20(USDC).balanceOf(wallet);
   }
 
   function testDepositRatioCalculator() public view {
@@ -25,8 +25,8 @@ contract ContractTest is Test, Logs, LocalVars {
     uint256 amountB = balanceUSDC;
 
     (uint256 amount0Ratioed, uint256 amount1Ratioed) = drc.calculateDepositRatio(
-      MAIN_WETH,
-      MAIN_USDC,
+      WETH,
+      USDC,
       500,
       amountA,
       amountB,

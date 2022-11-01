@@ -43,8 +43,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     simpleStrategies = new SimpleStrategies();
     tokenA = USDC;
     tokenB = WETH;
-    // tokenA = ARB_USDC;
-    // tokenB = ARB_WETH;
     fee = 500;
     lowerLimitB = 0.001 ether;
     upperLimitB = 0.0005 ether;
@@ -64,7 +62,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     compound(slippage);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     stack(tokenA, slippage);
-    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
+    updateRange(USDC, 1200_000000, 1800_000000, slippage);
   }
 
   function testFullLogs() public {
@@ -92,11 +90,11 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     compound(slippage);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     stack(tokenA, slippage);
-    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
+    updateRange(USDC, 1200_000000, 1800_000000, slippage);
   }
 
   function testPoolConstruct() internal {
-    initialize(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
+    initialize(WETH, USDC, 500, 1000_000000, 2000_000000);
     logLimits(rangePool);
   }
 

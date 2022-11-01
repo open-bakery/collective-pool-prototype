@@ -15,8 +15,9 @@ contract Deploy is Script {
   address uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
   address positionManager = vm.envAddress('UNISWAP_V3_NFPM');
 
-  address WETH = vm.envAddress('ARB_WETH');
-  address USDC = vm.envAddress('ARB_USDC');
+  address WETH = vm.envAddress('WETH');
+  address USDC = vm.envAddress('USDC');
+  string NETWORK = vm.envString('NETWORK');
   string DEPLOY_OUT = vm.envString('DEPLOY_OUT');
 
   uint24 FEE0_05 = 500;
@@ -78,6 +79,7 @@ contract Deploy is Script {
     address pool2 = factory.deployRangePool(WETH, USDC, FEE0_30, usdcAmount(500), usdcAmount(4000));
     outputProp('pool2', vm.toString(pool2));
     outputProp('startBlock', vm.toString(block.number));
+    outputProp('network', NETWORK);
 
     outputEnd();
     vm.stopBroadcast();

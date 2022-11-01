@@ -19,6 +19,7 @@ contracts[lens]=Lens
 contracts[pool]=RangePool
 contracts[erc20]=ERC20
 contracts[uniPool]=IUniswapV3Pool
+contracts[positionManager]=NonfungiblePositionManager
 
 indexImport=""
 indexExport="export const abis = {
