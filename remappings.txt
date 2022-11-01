@@ -2,5 +2,6 @@
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 @uniswap/v3-core/contracts=lib/v3-core/contracts/
 @uniswap/v3-periphery/contracts=lib/v3-periphery/contracts/
+@uniswap/lib=lib/solidity-lib
 @openzeppelin/contracts/token/ERC721/IERC721Metadata.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Metadata.sol
 @openzeppelin/contracts/token/ERC721/IERC721Enumerable.sol=lib/openzeppelin-contracts/contracts/token/ERC721/extensions/IERC721Enumerable.sol
