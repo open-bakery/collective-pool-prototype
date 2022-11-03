@@ -4,9 +4,11 @@ BASEDIR="$PWD/$(dirname "$0")"
 echo "getting env vars from $BASEDIR/.env"
 . "$BASEDIR/.env"
 
-echo "deploying locally with key: $DEV_PRIVATE_KEY"
+echo "deploying locally with key: $DEPLOYER_PRIVATE_KEY"
 rm "$BASEDIR/$DEPLOY_OUT"
-RUST_BACKTRACE=full forge script script/DevDeploy.s.sol:Deploy --fork-url http://127.0.0.1:8545 --private-key $DEV_PRIVATE_KEY --broadcast
+
+PARAMS="--rpc-url http://127.0.0.1:8545 --private-key $DEPLOYER_PRIVATE_KEY";
+forge script script/Deploy.s.sol:Deploy $PARAMS --slow --broadcast --sizes -vvv
 
 # extract abis from artifacts. They'll be linked from subgraph and ui projects
 DIST_DIR="$BASEDIR/dist"
