@@ -25,8 +25,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   using SafeMath for uint256;
   using SafeERC20 for ERC20;
 
-  address public uniFactory = vm.envAddress('UNISWAP_V3_FACTORY');
-  address public positionManager = vm.envAddress('UNISWAP_V3_NFPM');
   RangePoolFactory public rangePoolFactory;
   SimpleStrategies public simpleStrategies;
   RangePool public rangePool;
@@ -39,7 +37,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
 
   function setUp() public {
     lens = new Lens();
-    rangePoolFactory = new RangePoolFactory(uniFactory, positionManager, WETH, address(lens));
+    rangePoolFactory = new RangePoolFactory(address(factory), address(router), address(NFPM), WETH, address(lens));
     simpleStrategies = new SimpleStrategies();
     tokenA = USDC;
     tokenB = WETH;

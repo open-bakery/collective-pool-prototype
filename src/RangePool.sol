@@ -158,7 +158,9 @@ contract RangePool is Ownable {
         amount0: _amount0,
         amount1: _amount1,
         slippage: _slippage
-      })
+      }),
+      address(rangePoolFactory.uniFactory()),
+      address(rangePoolFactory.router())
     );
 
     if (tokenId == 0) {

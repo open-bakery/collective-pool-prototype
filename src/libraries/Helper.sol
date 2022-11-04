@@ -39,14 +39,19 @@ library Helper {
 
   uint16 public constant resolution = 10_000;
 
-  function swap(Swapper.SwapParameters memory params) external returns (uint256 amountOut) {
-    return Swapper.swap(params);
+  function swap(
+    Swapper.SwapParameters memory params,
+    address uniswapFactory,
+    address router
+  ) external returns (uint256 amountOut) {
+    return Swapper.swap(params, uniswapFactory, router);
   }
 
-  function convertToRatio(ConvertRatioParams memory params)
-    external
-    returns (uint256 convertedAmount0, uint256 convertedAmount1)
-  {
+  function convertToRatio(
+    ConvertRatioParams memory params,
+    address uniswapFactory,
+    address router
+  ) external returns (uint256 convertedAmount0, uint256 convertedAmount1) {
     (uint256 targetAmount0, uint256 targetAmount1) = RatioCalculator.calculateRatio(
       Conversion.sqrtPriceX96(params.rangePool.pool()),
       params.rangePool.pool().liquidity(),
@@ -75,7 +80,9 @@ library Helper {
         amountIn: diff,
         slippage: params.slippage,
         oracleSeconds: params.rangePool.oracleSeconds()
-      })
+      }),
+      uniswapFactory,
+      router
     );
 
     (convertedAmount0, convertedAmount1) = (zeroForOne)

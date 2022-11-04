@@ -11,11 +11,12 @@ import '../src/Lens.sol';
 contract ContractTest is Test {
   function testFactoryHasAllPropertiesWhenDeployed() public {
     address positionManager = makeAddr('positionManager');
+    address router = makeAddr('router');
     address uniFactory = makeAddr('uniFactory');
     address weth = makeAddr('weth');
     address lens = makeAddr('lens');
 
-    RangePoolFactory factory = new RangePoolFactory(positionManager, uniFactory, weth, lens);
+    RangePoolFactory factory = new RangePoolFactory(uniFactory, router, positionManager, weth, lens);
 
     assertEq(address(factory.lens()), lens);
   }
