@@ -31,7 +31,7 @@ contract RangePool is Ownable {
 
   int24 public lowerTick;
   int24 public upperTick;
-  uint32 public oracleSeconds = 60;
+  uint32 public oracleSeconds = 1;
 
   uint256 public tokenId;
   uint256 public totalClaimedFees0;
@@ -39,6 +39,7 @@ contract RangePool is Ownable {
 
   mapping(address => bool) public isRegistered;
 
+  event Mint(address indexed recipient, uint256 tokenId);
   event LiquidityIncreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
   event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
@@ -220,6 +221,7 @@ contract RangePool is Ownable {
     if (address(lpToken) == address(0)) lpToken = new LiquidityProviderToken(_generatedTokenId);
     lpToken.mint(_account, _liquidityAdded);
     emit LiquidityIncreased(_account, _amountAdded0, _amountAdded1, _liquidityAdded);
+    emit Mint(_account, _generatedTokenId);
   }
 
   function _increaseLiquidity(

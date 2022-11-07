@@ -3,8 +3,10 @@ pragma solidity >=0.7.0 <0.9.0;
 pragma abicoder v2;
 
 import 'forge-std/Script.sol';
+import 'forge-std/console.sol';
 
 import '@uniswap/v3-core/contracts/UniswapV3Factory.sol';
+import '@uniswap/v3-core/contracts/libraries/Oracle.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-periphery/contracts/SwapRouter.sol' as SR;
@@ -14,36 +16,14 @@ import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.s
 import '@uniswap/v3-periphery/contracts/NonfungibleTokenPositionDescriptor.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 
-import '../src/utility/DeployUtils.sol';
 import '../src/utility/Token.sol';
-import '../src/Lens.sol';
 import '../src/libraries/Conversion.sol';
+import './DeployCommon.sol';
 
-import 'forge-std/console.sol';
-
-contract Deploy is DeployUtils {
+contract DeployUniswap is DeployCommon {
   UniswapV3Factory uniFactory;
   ISwapRouter router;
-  RangePoolFactory rpFactory;
-  Tokens tokens;
   INonfungiblePositionManager positionManager;
-
-  struct Tokens {
-    address weth;
-    address usdc;
-    //    address dai;
-    //    address gmx;
-  }
-
-  struct PoolProps {
-    address tokenA;
-    address tokenB;
-    uint24 fee;
-  }
-
-  struct Pools {
-    address pool1;
-  }
 
   function createAndDistributeTokens() internal {
     tokens.weth = createAndDistributeToken('WETH');
@@ -89,7 +69,12 @@ contract Deploy is DeployUtils {
     );
   }
 
-  function createUniPool(PoolProps memory props, uint256 initPrice) private returns (IUniswapV3Pool) {
+  function createUniPool(
+    PoolProps memory props,
+    uint256 amountA,
+    uint256 amountB,
+    uint256 initPrice
+  ) private returns (IUniswapV3Pool) {
     // not sure where it's expected to be normalized and where not, so let's just do it ourselves
     (address token0, address token1) = props.tokenA < props.tokenB
       ? (props.tokenA, props.tokenB)
@@ -105,12 +90,14 @@ contract Deploy is DeployUtils {
     Token(props.tokenB).approve(address(positionManager), maxAllowance);
 
     // intialize
-    uint256 actualInitPrice = token0 == props.tokenA ? initPrice : 10**decimals / initPrice;
-    pool.initialize(Conversion.uintToSqrtPriceX96(actualInitPrice, decimals));
+    if (token0 != props.tokenA) {
+      initPrice = 10**decimals / initPrice;
+    }
+    pool.initialize(Conversion.uintToSqrtPriceX96(initPrice, decimals));
 
     (int24 tickLower, int24 tickUpper) = Conversion.convertLimitsToTicks(
-      (actualInitPrice * 5) / 10,
-      actualInitPrice * 2,
+      (initPrice * 5) / 10,
+      initPrice * 2,
       TICK_SPACING[props.fee],
       decimals
     );
@@ -125,8 +112,8 @@ contract Deploy is DeployUtils {
         //        tickUpper: MAX_TICK,
         tickLower: tickLower,
         tickUpper: tickUpper,
-        amount0Desired: amount(100),
-        amount1Desired: amount(100),
+        amount0Desired: props.tokenA < props.tokenB ? amount(amountA) : amount(amountB),
+        amount1Desired: props.tokenA < props.tokenB ? amount(amountB) : amount(amountA),
         amount0Min: 0,
         amount1Min: 0,
         recipient: msg.sender,
@@ -136,33 +123,14 @@ contract Deploy is DeployUtils {
     return pool;
   }
 
-  function createRangePool(
-    PoolProps memory props,
-    uint256 priceFrom,
-    uint256 priceTo
-  ) private returns (RangePool) {
-    RangePool rangePool = RangePool(
-      rpFactory.deployRangePool(props.tokenA, props.tokenB, props.fee, priceFrom, priceTo)
-    );
-    Token(props.tokenA).approve(address(rangePool), maxAllowance);
-    Token(props.tokenB).approve(address(rangePool), maxAllowance);
-    //    rangePool.addLiquidity(amount(10), amount(10), maxSlippage); // this breaks?
-    return rangePool;
-  }
-
   function run() external {
     vm.startBroadcast();
 
     init();
     createAndDistributeTokens();
+    initPoolProps();
 
     uniFactory = new UniswapV3Factory();
-
-    PoolProps memory poolProps1 = PoolProps({ tokenA: tokens.weth, tokenB: tokens.usdc, fee: FEE_0_30 });
-    PoolProps memory poolProps2 = PoolProps({ tokenA: tokens.weth, tokenB: tokens.usdc, fee: FEE_1_00 });
-    //    PoolProps memory poolProps3 = PoolProps({ tokenA: tokens.usdc, tokenB: tokens.dai, fee: FEE_0_05 });
-
-    // uniswap periphery
     NonfungibleTokenPositionDescriptor tokenPositionDescriptor = new NonfungibleTokenPositionDescriptor(
       tokens.weth,
       'ETH'
@@ -175,22 +143,13 @@ contract Deploy is DeployUtils {
     router = new SR.SwapRouter(address(uniFactory), tokens.weth);
 
     // let's deploy a few pools here. we'll need them later
-    IUniswapV3Pool uniPool1 = createUniPool(poolProps1, 1500);
+    IUniswapV3Pool pool1 = createUniPool(poolProps[1], 100, 150000, 1500);
+    //    swap(poolProps[1].tokenA, poolProps[1].tokenB, poolProps[1].fee, amount(1));
     //    IUniswapV3Pool uniPool2 = createUniPool(poolProps2, 1600);
 
     //    IUniswapV3Pool uniPool3 = createUniPool(poolProps3, 1);
     //    uniFactory.createPool(weth, gmx, FEE_0_30);
     //    uniFactory.createPool(gmx, dai, FEE_0_30);
-
-    // our stuff
-    Lens lens = new Lens();
-    rpFactory = new RangePoolFactory(
-      address(uniFactory),
-      address(router),
-      address(positionManager),
-      tokens.weth,
-      address(lens)
-    );
 
     //    rpFactory.deployRangePool(weth, gmx, FEE_0_30, ethAmount(10), ethAmount(100));
     //    rpFactory.deployRangePool(gmx, dai, FEE_0_30, ethAmount(20), ethAmount(80));
@@ -198,15 +157,12 @@ contract Deploy is DeployUtils {
     //    vm.stopBroadcast();
     //    vm.startBroadcast(BOB);
 
-    // for oracle to work (see RangePool.oracleSeconds)
-    RangePool pool1 = createRangePool(poolProps1, amount(1000), amount(2000));
-    //    RangePool pool2 = createRangePool(poolProps2, amount(1200), amount(1800));
-    //    RangePool pool3 = createRangePool(poolProps1, amount(800), amount(2400));
-    console.log('block timestamp before warp', block.timestamp);
-    console.log('block timestamp after warp', block.timestamp);
+    // just a dummy transaction to make sure blocks are written properly...
+    // seems to be a forge issue. The transactions before only get writtern onchain in the second script???
+    ERC20(tokens.usdc).transfer(BOB, amount(1));
+
     vm.stopBroadcast();
 
-    outputStart();
     outputProp('startBlock', vm.toString(block.number));
     outputProp('network', NETWORK);
 
@@ -218,12 +174,13 @@ contract Deploy is DeployUtils {
     outputProp('usdc', vm.toString(tokens.usdc));
     //    outputProp('gmx', vm.toString(tokens.gmx));
     //    outputProp('dai', vm.toString(tokens.dai));
-    outputProp('lens', vm.toString(address(lens)));
-    outputProp('factory', vm.toString(address(rpFactory)));
-    outputProp('pool1', vm.toString(address(pool1)));
-    //    outputProp('pool2', vm.toString(address(pool2)));
-    writeAddress('pool1', address(pool1));
-    outputEnd();
+
+    writeAddress('weth', tokens.weth);
+    writeAddress('usdc', tokens.usdc);
+
+    writeAddress('uniFactory', address(uniFactory));
+    writeAddress('router', address(router));
+    writeAddress('positionManager', address(positionManager));
   }
 }
 
