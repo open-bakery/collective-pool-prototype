@@ -78,7 +78,9 @@ contract SimpleStrategies {
         amountIn: amountIn,
         slippage: slippage,
         oracleSeconds: rangePool.oracleSeconds()
-      })
+      }),
+      address(rangePool.rangePoolFactory().uniFactory()),
+      address(rangePool.rangePoolFactory().router())
     );
 
     amountStacked = Helper.safeBalanceTransfer(

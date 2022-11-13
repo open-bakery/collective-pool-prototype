@@ -4,24 +4,32 @@ pragma abicoder v2;
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
 import './RangePool.sol';
+import './Lens.sol';
 
 contract RangePoolFactory {
-  address public immutable WETH;
   INonfungiblePositionManager public immutable positionManager;
   IUniswapV3Factory public immutable uniFactory;
+  ISwapRouter public immutable router;
+  address public immutable WETH;
+  Lens public immutable lens;
 
   event RangePoolDeployed(address indexed deployer, address indexed rangePool);
 
   constructor(
-    address uniswapFactory,
-    address nonfungiblePositionManager,
-    address _weth
+    address _uniFactory,
+    address _router,
+    address _positionManager,
+    address _weth,
+    address _lens
   ) {
-    positionManager = INonfungiblePositionManager(nonfungiblePositionManager);
-    uniFactory = IUniswapV3Factory(uniswapFactory);
+    positionManager = INonfungiblePositionManager(_positionManager);
+    uniFactory = IUniswapV3Factory(_uniFactory);
+    router = ISwapRouter(_router);
     WETH = _weth;
+    lens = Lens(_lens);
   }
 
   function deployRangePool(
