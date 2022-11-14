@@ -16,8 +16,9 @@ import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 
 import '../src/utility/DeployUtils.sol';
 import '../src/utility/Token.sol';
-import '../src/Lens.sol';
 import '../src/libraries/Conversion.sol';
+
+import '../src/RangePoolFactory.sol';
 
 import 'forge-std/console.sol';
 
@@ -183,13 +184,11 @@ contract Deploy is DeployUtils {
     //    uniFactory.createPool(gmx, dai, FEE_0_30);
 
     // our stuff
-    Lens lens = new Lens();
     rpFactory = new RangePoolFactory(
       address(uniFactory),
       address(router),
       address(positionManager),
-      tokens.weth,
-      address(lens)
+      tokens.weth
     );
 
     //    rpFactory.deployRangePool(weth, gmx, FEE_0_30, ethAmount(10), ethAmount(100));
@@ -218,7 +217,6 @@ contract Deploy is DeployUtils {
     outputProp('usdc', vm.toString(tokens.usdc));
     //    outputProp('gmx', vm.toString(tokens.gmx));
     //    outputProp('dai', vm.toString(tokens.dai));
-    outputProp('lens', vm.toString(address(lens)));
     outputProp('factory', vm.toString(address(rpFactory)));
     outputProp('pool1', vm.toString(address(pool1)));
     //    outputProp('pool2', vm.toString(address(pool2)));

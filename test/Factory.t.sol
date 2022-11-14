@@ -14,10 +14,8 @@ contract ContractTest is Test {
     address router = makeAddr('router');
     address uniFactory = makeAddr('uniFactory');
     address weth = makeAddr('weth');
-    address lens = makeAddr('lens');
+    // address lens = makeAddr('lens');
 
-    RangePoolFactory factory = new RangePoolFactory(uniFactory, router, positionManager, weth, lens);
-
-    assertEq(address(factory.lens()), lens);
+    RangePoolFactory factory = new RangePoolFactory(uniFactory, router, positionManager, weth);
   }
 }

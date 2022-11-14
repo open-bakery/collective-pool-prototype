@@ -32,7 +32,6 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   RangePoolFactory public rangePoolFactory;
   SimpleStrategies public simpleStrategies;
   RangePool public rangePool;
-  //  Lens public lens; // inherited from Logs
   address public tokenA;
   address public tokenB;
   uint24 public fee;
@@ -40,11 +39,17 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   uint256 public upperLimitB;
 
   function setUp() public {
-    lens = new Lens();
-    rangePoolFactory = new RangePoolFactory(address(factory), address(router), address(NFPM), WETH, address(lens));
+    rangePoolFactory = new RangePoolFactory(
+      address(uniswapFactory),
+      address(uniswapRouter),
+      address(positionManager),
+      WETH
+    );
     simpleStrategies = new SimpleStrategies();
     tokenA = USDC;
     tokenB = WETH;
+    // tokenA = ARB_USDC;
+    // tokenB = ARB_WETH;
     fee = 500;
     lowerLimitB = 0.001 ether;
     upperLimitB = 0.0005 ether;
@@ -64,7 +69,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     compound(slippage);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     stack(tokenA, slippage);
-    updateRange(USDC, 1200_000000, 1800_000000, slippage);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
   }
 
   function testFullLogs() public {
@@ -92,11 +97,11 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     compound(slippage);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     stack(tokenA, slippage);
-    updateRange(USDC, 1200_000000, 1800_000000, slippage);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
   }
 
   function testPoolConstruct() internal {
-    initialize(WETH, USDC, 500, 1000_000000, 2000_000000);
+    initialize(MAIN_WETH, MAIN_USDC, 500, 1000_000000, 2000_000000);
     logLimits(rangePool);
   }
 
@@ -264,8 +269,8 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint24 _fee,
     uint8 _swaps
   ) internal {
-    ERC20(_tokenA).approve(address(router), type(uint256).max);
-    ERC20(_tokenB).approve(address(router), type(uint256).max);
+    ERC20(_tokenA).approve(address(uniswapRouter), type(uint256).max);
+    ERC20(_tokenB).approve(address(uniswapRouter), type(uint256).max);
     deal(address(_tokenA), address(this), _amountA);
     uint256 receivedA;
     uint256 receivedB;
@@ -284,7 +289,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
     uint24 _fee,
     uint256 amountIn
   ) internal returns (uint256 amountOut) {
-    IUniswapV3Pool pool = IUniswapV3Pool(factory.getPool(tokenIn, tokenOut, _fee));
+    IUniswapV3Pool pool = IUniswapV3Pool(uniswapFactory.getPool(tokenIn, tokenOut, _fee));
     (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
     uint160 limit = pool.token0() == tokenIn ? sqrtPriceX96 - sqrtPriceX96 / 10 : sqrtPriceX96 + sqrtPriceX96 / 10;
@@ -300,7 +305,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
       sqrtPriceLimitX96: limit
     });
 
-    amountOut = router.exactInputSingle(params);
+    amountOut = uniswapRouter.exactInputSingle(params);
   }
 
   function predictAddress(

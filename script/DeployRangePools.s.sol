@@ -9,7 +9,6 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
 import '../src/RangePool.sol';
 import '../src/utility/Token.sol';
-import '../src/Lens.sol';
 
 import './DeployCommon.sol';
 
@@ -37,13 +36,11 @@ contract DeployRangePools is DeployCommon {
     tokens = Tokens({ weth: readAddress('weth'), usdc: readAddress('usdc') });
     initPoolProps();
 
-    Lens lens = new Lens();
     rpFactory = new RangePoolFactory(
       readAddress('uniFactory'),
       readAddress('router'),
       readAddress('positionManager'),
-      tokens.weth,
-      address(lens)
+      tokens.weth
     );
     vm.stopBroadcast();
 
@@ -61,7 +58,6 @@ contract DeployRangePools is DeployCommon {
     //    poolB2.addLiquidity(amount(5), amount(5), maxSlippage);
     vm.stopBroadcast();
 
-    outputProp('lens', vm.toString(address(lens)));
     outputProp('factory', vm.toString(address(rpFactory)));
   }
 }

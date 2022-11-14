@@ -31,7 +31,7 @@ contract RangePool is Ownable {
 
   int24 public lowerTick;
   int24 public upperTick;
-  uint32 public oracleSeconds = 1;
+  uint32 public oracleSeconds = 60;
 
   uint256 public tokenId;
   uint256 public totalClaimedFees0;
@@ -58,7 +58,7 @@ contract RangePool is Ownable {
     uint256 _upperLimitInTokenB
   ) {
     rangePoolFactory = RangePoolFactory(msg.sender);
-    pool = IUniswapV3Pool(Helper.getPoolAddress(_tokenA, _tokenB, _fee, address(rangePoolFactory.uniFactory())));
+    pool = IUniswapV3Pool(Helper.getPoolAddress(_tokenA, _tokenB, _fee, address(rangePoolFactory.uniswapFactory())));
 
     (lowerTick, upperTick) = Helper.validateAndConvertLimits(pool, _tokenB, _lowerLimitInTokenB, _upperLimitInTokenB);
 
@@ -160,8 +160,8 @@ contract RangePool is Ownable {
         amount1: _amount1,
         slippage: _slippage
       }),
-      address(rangePoolFactory.uniFactory()),
-      address(rangePoolFactory.router())
+      address(rangePoolFactory.uniswapFactory()),
+      address(rangePoolFactory.uniswapRouter())
     );
 
     if (tokenId == 0) {
