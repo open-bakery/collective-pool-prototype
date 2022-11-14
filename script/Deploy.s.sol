@@ -187,8 +187,7 @@ contract Deploy is DeployUtils {
     rpFactory = new RangePoolFactory(
       address(uniFactory),
       address(router),
-      address(positionManager),
-      tokens.weth
+      address(positionManager)
     );
 
     //    rpFactory.deployRangePool(weth, gmx, FEE_0_30, ethAmount(10), ethAmount(100));

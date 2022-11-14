@@ -12,6 +12,8 @@ testLocal:; forge test -vvv --match-test testAnvil*
 
 testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(FORK_RPC_URL)
 
+testPositionManager:; forge test -vvv --mc RangePoolPositionManager* --fork-url $(FORK_RPC_URL)
+
 testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
 # testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL) --gas-report
 

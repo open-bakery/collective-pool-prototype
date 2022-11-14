@@ -3,8 +3,8 @@ pragma solidity >=0.5.0 <0.8.0;
 pragma abicoder v2;
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 
 import './RangePool.sol';
 
@@ -12,20 +12,17 @@ contract RangePoolFactory {
   IUniswapV3Factory public immutable uniswapFactory;
   ISwapRouter public immutable uniswapRouter;
   INonfungiblePositionManager public immutable positionManager;
-  address public immutable WETH;
 
   event RangePoolDeployed(address indexed deployer, address indexed rangePool);
 
   constructor(
     address _uniswapFactory,
     address _uniswapRouter,
-    address _positionManager,
-    address _weth
+    address _positionManager
   ) {
     positionManager = INonfungiblePositionManager(_positionManager);
     uniswapFactory = IUniswapV3Factory(_uniswapFactory);
     uniswapRouter = ISwapRouter(_uniswapRouter);
-    WETH = _weth;
   }
 
   function deployRangePool(

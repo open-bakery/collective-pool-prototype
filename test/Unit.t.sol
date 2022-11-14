@@ -39,12 +39,7 @@ contract UnitTest is Test, LocalVars, Logs, LogsTest, IERC721Receiver {
   uint256 public upperLimitB;
 
   function setUp() public {
-    rangePoolFactory = new RangePoolFactory(
-      address(uniswapFactory),
-      address(uniswapRouter),
-      address(positionManager),
-      WETH
-    );
+    rangePoolFactory = new RangePoolFactory(address(uniswapFactory), address(uniswapRouter), address(positionManager));
     simpleStrategies = new SimpleStrategies();
     tokenA = USDC;
     tokenB = WETH;

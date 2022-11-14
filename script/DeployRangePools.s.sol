@@ -36,12 +36,7 @@ contract DeployRangePools is DeployCommon {
     tokens = Tokens({ weth: readAddress('weth'), usdc: readAddress('usdc') });
     initPoolProps();
 
-    rpFactory = new RangePoolFactory(
-      readAddress('uniFactory'),
-      readAddress('router'),
-      readAddress('positionManager'),
-      tokens.weth
-    );
+    rpFactory = new RangePoolFactory(readAddress('uniFactory'), readAddress('router'), readAddress('positionManager'));
     vm.stopBroadcast();
 
     //    vm.startBroadcast(ALICE_KEY);
