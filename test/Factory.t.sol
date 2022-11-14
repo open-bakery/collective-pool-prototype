@@ -8,7 +8,7 @@ import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.s
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '../src/Lens.sol';
 
-contract ContractTest is Test {
+contract RangePoolFactoryTest is Test {
   function testFactoryHasAllPropertiesWhenDeployed() public {
     address positionManager = makeAddr('positionManager');
     address router = makeAddr('router');

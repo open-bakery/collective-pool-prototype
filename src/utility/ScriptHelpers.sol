@@ -2,51 +2,21 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import 'forge-std/Script.sol';
+import './DevConstants.sol';
 
 pragma abicoder v2;
 
-contract DeployUtils is Script {
+contract ScriptHelpers is DevConstants {
   string NETWORK = vm.envString('NETWORK');
   string DEPLOY_OUT = vm.envString('DEPLOY_OUT');
   address UNISWAP_V3_FACTORY = vm.envAddress('UNISWAP_V3_FACTORY');
   uint256 DEPLOYER_PRIVATE_KEY = vm.envUint('DEPLOYER_PRIVATE_KEY');
 
   //  address DEPLOYER = vm.envAddress('DEPLOYER_ADDRESS');
-  address ALICE = vm.envAddress('ALICE_ADDRESS');
-  address BOB = vm.envAddress('BOB_ADDRESS');
-  address CHARLIE = vm.envAddress('CHARLIE_ADDRESS');
-  uint256 ALICE_KEY = vm.envUint('ALICE_KEY');
-  uint256 BOB_KEY = vm.envUint('BOB_KEY');
-  uint256 CHARLIE_KEY = vm.envUint('CHARLIE_KEY');
-
-  uint24 FEE_0_05 = 500;
-  uint24 FEE_0_30 = 3000;
-  uint24 FEE_1_00 = 10000;
-
-  int24 TICK_SPACING_0_05 = 10;
-  int24 TICK_SPACING_0_30 = 60;
-  int24 TICK_SPACING_1_00 = 200;
 
   // these are almost the real minimal, but divisible by all tick spacings. uff. this game me some headaches.
-  int24 internal constant MIN_TICK = -886800;
-  int24 internal constant MAX_TICK = 886800;
-
-  uint160 internal constant MIN_SQRT_RATIO = 4295128739;
-  uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
-
-  mapping(uint24 => int24) public TICK_SPACING;
-
-  uint256 MAX_INT = 2**256 - 1;
 
   uint8 decimals = 18;
-  uint16 maxSlippage = 100_00;
-  uint256 maxAllowance = MAX_INT;
-
-  function init() public {
-    TICK_SPACING[FEE_0_05] = TICK_SPACING_0_05;
-    TICK_SPACING[FEE_0_30] = TICK_SPACING_0_30;
-    TICK_SPACING[FEE_1_00] = TICK_SPACING_1_00;
-  }
 
   function concat(string memory a, string memory b) public pure returns (string memory) {
     return string(abi.encodePacked(a, b));
