@@ -21,7 +21,7 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
     uint24 _fee,
     uint256 amountIn
   ) internal returns (uint256 amountOut) {
-    IUniswapV3Pool pool = IUniswapV3Pool(uniFactory.getPool(tokenIn, tokenOut, _fee));
+    IUniswapV3Pool pool = IUniswapV3Pool(IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(tokenIn, tokenOut, _fee));
 
     uint160 limit = pool.token0() == tokenIn ? MIN_SQRT_RATIO : MAX_SQRT_RATIO;
 
