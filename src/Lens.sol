@@ -15,14 +15,11 @@ contract Lens {
   using PositionValue for INonfungiblePositionManager;
 
   function principal(RangePool rp) external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = RangePoolFactory(rp.rangePoolFactory()).positionManager().principal(
-      rp.tokenId(),
-      Conversion.sqrtPriceX96(rp.pool())
-    );
+    (amount0, amount1) = rp.positionManager().principal(rp.tokenId(), Conversion.sqrtPriceX96(rp.pool()));
   }
 
   function unclaimedFees(RangePool rp) external view returns (uint256 amount0, uint256 amount1) {
-    (amount0, amount1) = RangePoolFactory(rp.rangePoolFactory()).positionManager().fees(rp.tokenId());
+    (amount0, amount1) = rp.positionManager().fees(rp.tokenId());
   }
 
   function sqrtPriceX96(RangePool rp) external view returns (uint160) {
@@ -61,11 +58,11 @@ contract Lens {
 
   function tokenAmountsAtLowerLimit(RangePool rp) external view returns (uint256 amount0, uint256 amount1) {
     (uint256 lowerAmount0, ) = Helper.getAmountsAtSqrtPrice(
-      uint128(rp.lpToken().balanceOf(rp.owner())),
+      Helper.positionLiquidity(rp.positionManager(), rp.tokenId()),
       TickMath.getSqrtRatioAtTick(rp.lowerTick())
     );
     (uint256 higherAmount0, ) = Helper.getAmountsAtSqrtPrice(
-      uint128(rp.lpToken().balanceOf(rp.owner())),
+      Helper.positionLiquidity(rp.positionManager(), rp.tokenId()),
       TickMath.getSqrtRatioAtTick(rp.upperTick())
     );
     amount0 = lowerAmount0.sub(higherAmount0);
@@ -74,11 +71,11 @@ contract Lens {
 
   function tokenAmountsAtUpperLimit(RangePool rp) external view returns (uint256 amount0, uint256 amount1) {
     (, uint256 lowerAmount1) = Helper.getAmountsAtSqrtPrice(
-      uint128(rp.lpToken().balanceOf(rp.owner())),
+      Helper.positionLiquidity(rp.positionManager(), rp.tokenId()),
       TickMath.getSqrtRatioAtTick(rp.lowerTick())
     );
     (, uint256 higherAmount1) = Helper.getAmountsAtSqrtPrice(
-      uint128(rp.lpToken().balanceOf(rp.owner())),
+      Helper.positionLiquidity(rp.positionManager(), rp.tokenId()),
       TickMath.getSqrtRatioAtTick(rp.upperTick())
     );
     amount0 = 0;

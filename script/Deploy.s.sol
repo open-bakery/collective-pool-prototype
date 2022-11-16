@@ -72,7 +72,6 @@ contract Deploy is DeployUtils {
     uint256 amountIn
   ) internal returns (uint256 amountOut) {
     IUniswapV3Pool pool = IUniswapV3Pool(uniFactory.getPool(tokenIn, tokenOut, _fee));
-    (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
     uint160 limit = pool.token0() == tokenIn ? MIN_SQRT_RATIO : MAX_SQRT_RATIO;
 
@@ -122,8 +121,8 @@ contract Deploy is DeployUtils {
         token0: token0,
         token1: token1,
         fee: props.fee,
-        //        tickLower: MIN_TICK,
-        //        tickUpper: MAX_TICK,
+        // tickLower: MIN_TICK,
+        // tickUpper: MAX_TICK,
         tickLower: tickLower,
         tickUpper: tickUpper,
         amount0Desired: amount(100),
@@ -160,8 +159,8 @@ contract Deploy is DeployUtils {
     uniFactory = new UniswapV3Factory();
 
     PoolProps memory poolProps1 = PoolProps({ tokenA: tokens.weth, tokenB: tokens.usdc, fee: FEE_0_30 });
-    PoolProps memory poolProps2 = PoolProps({ tokenA: tokens.weth, tokenB: tokens.usdc, fee: FEE_1_00 });
-    //    PoolProps memory poolProps3 = PoolProps({ tokenA: tokens.usdc, tokenB: tokens.dai, fee: FEE_0_05 });
+    // PoolProps memory poolProps2 = PoolProps({ tokenA: tokens.weth, tokenB: tokens.usdc, fee: FEE_1_00 });
+    // PoolProps memory poolProps3 = PoolProps({ tokenA: tokens.usdc, tokenB: tokens.dai, fee: FEE_0_05 });
 
     // uniswap periphery
     NonfungibleTokenPositionDescriptor tokenPositionDescriptor = new NonfungibleTokenPositionDescriptor(
@@ -176,7 +175,7 @@ contract Deploy is DeployUtils {
     router = new SR.SwapRouter(address(uniFactory), tokens.weth);
 
     // let's deploy a few pools here. we'll need them later
-    IUniswapV3Pool uniPool1 = createUniPool(poolProps1, 1500);
+    // IUniswapV3Pool uniPool1 = createUniPool(poolProps1, 1500);
     //    IUniswapV3Pool uniPool2 = createUniPool(poolProps2, 1600);
 
     //    IUniswapV3Pool uniPool3 = createUniPool(poolProps3, 1);

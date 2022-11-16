@@ -11,7 +11,7 @@ import './RangePoolFactory.sol';
 import './RangePool.sol';
 import './LiquidityProviderToken.sol';
 
-contract RangePoolPositionManager is Ownable {
+contract RangePoolManager is Ownable {
   using SafeERC20 for ERC20;
 
   struct PositionData {
@@ -24,15 +24,21 @@ contract RangePoolPositionManager is Ownable {
 
   address weth;
 
+  mapping(address => bool) public isRegistered; // isRegistered[rangePool][strategy] = bool;
   mapping(address => address) poolController;
   mapping(address => address) public liquitityToken; // liquidityToken[rangePool] = address;
   mapping(address => mapping(address => PositionData)) public position; // position[rangePool][user] = PositionData;
 
+  modifier onlyAllowed() {
+    require(msg.sender == owner() || isRegistered[msg.sender] == true, 'RangePool:NA'); // Caller not allowed
+    _;
+  }
+
   event RangePoolCreated(address indexed rangePool);
 
   constructor(address rangePoolFactory_, address weth_) {
-    weth = weth_;
     rangePoolFactory = RangePoolFactory(rangePoolFactory_);
+    weth = weth_;
   }
 
   function createRangePool(
@@ -42,8 +48,8 @@ contract RangePoolPositionManager is Ownable {
     uint256 lowerLimitInTokenB,
     uint256 upperLimitInTokenB,
     bool privatePool
-  ) external {
-    address rangePool = rangePoolFactory.deployRangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
+  ) external returns (address rangePool) {
+    rangePool = rangePoolFactory.deployRangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
     if (privatePool) poolController[rangePool] = msg.sender;
     emit RangePoolCreated(rangePool);
   }

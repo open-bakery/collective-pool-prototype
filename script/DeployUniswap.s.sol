@@ -51,7 +51,6 @@ contract DeployUniswap is DeployCommon {
     uint256 amountIn
   ) internal returns (uint256 amountOut) {
     IUniswapV3Pool pool = IUniswapV3Pool(uniFactory.getPool(tokenIn, tokenOut, _fee));
-    (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
     uint160 limit = pool.token0() == tokenIn ? MIN_SQRT_RATIO : MAX_SQRT_RATIO;
 
@@ -143,7 +142,7 @@ contract DeployUniswap is DeployCommon {
     router = new SR.SwapRouter(address(uniFactory), tokens.weth);
 
     // let's deploy a few pools here. we'll need them later
-    IUniswapV3Pool pool1 = createUniPool(poolProps[1], 100, 150000, 1500);
+    // IUniswapV3Pool pool1 = createUniPool(poolProps[1], 100, 150000, 1500);
     //    swap(poolProps[1].tokenA, poolProps[1].tokenB, poolProps[1].fee, amount(1));
     //    IUniswapV3Pool uniPool2 = createUniPool(poolProps2, 1600);
 

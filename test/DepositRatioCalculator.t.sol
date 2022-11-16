@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.5.0 <0.8.0;
 
-import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
-
-import './LocalVars.t.sol';
+import '../src/utility/Utils.sol';
 import '../src/DepositRatioCalculator.sol';
-import '../src/logs/Logs.sol';
-import 'forge-std/Test.sol';
 
-contract ContractTest is Test, Logs, LocalVars {
+contract DepositRatioCalculatorTest is Utils {
   address wallet = vm.envAddress('WALLET');
   uint256 balanceETH;
   uint256 balanceUSDC;

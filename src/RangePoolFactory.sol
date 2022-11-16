@@ -6,12 +6,13 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 
+import './interfaces/IRangePool.sol';
 import './RangePool.sol';
 
 contract RangePoolFactory {
-  IUniswapV3Factory public immutable uniswapFactory;
-  ISwapRouter public immutable uniswapRouter;
-  INonfungiblePositionManager public immutable positionManager;
+  address public immutable uniswapFactory;
+  address public immutable uniswapRouter;
+  address public immutable positionManager;
 
   event RangePoolDeployed(address indexed deployer, address indexed rangePool);
 
@@ -20,9 +21,9 @@ contract RangePoolFactory {
     address _uniswapRouter,
     address _positionManager
   ) {
-    positionManager = INonfungiblePositionManager(_positionManager);
-    uniswapFactory = IUniswapV3Factory(_uniswapFactory);
-    uniswapRouter = ISwapRouter(_uniswapRouter);
+    positionManager = _positionManager;
+    uniswapFactory = _uniswapFactory;
+    uniswapRouter = _uniswapRouter;
   }
 
   function deployRangePool(
@@ -32,7 +33,18 @@ contract RangePoolFactory {
     uint256 lowerLimitInTokenB,
     uint256 upperLimitInTokenB
   ) external returns (address) {
-    RangePool rangePool = new RangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
+    IRangePool.DeploymentParameters memory params = IRangePool.DeploymentParameters({
+      uniswapFactory: uniswapFactory,
+      uniswapRouter: uniswapRouter,
+      positionManager: positionManager,
+      tokenA: tokenA,
+      tokenB: tokenB,
+      fee: fee,
+      lowerLimitInTokenB: lowerLimitInTokenB,
+      upperLimitInTokenB: upperLimitInTokenB
+    });
+
+    RangePool rangePool = new RangePool(params);
     rangePool.transferOwnership(msg.sender);
 
     emit RangePoolDeployed(msg.sender, address(rangePool));

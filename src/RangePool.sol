@@ -10,25 +10,23 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
-import './libraries/Helper.sol';
+import './interfaces/IRangePool.sol';
 
+import './libraries/Helper.sol';
 import './RangePoolFactory.sol';
-import './LiquidityProviderToken.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
-contract RangePool is Ownable {
+contract RangePool is IRangePool, Ownable {
   using SafeERC20 for ERC20;
   using Address for address;
   using SafeMath for uint256;
 
-  IUniswapV3Factory public immutable uniswapFactory;
-  ISwapRouter public immutable uniswapRouter;
+  address public immutable uniswapFactory;
+  address public immutable uniswapRouter;
   INonfungiblePositionManager public immutable positionManager;
 
-  RangePoolFactory public rangePoolFactory;
   IUniswapV3Pool public pool;
-  LiquidityProviderToken public lpToken;
 
   int24 public lowerTick;
   int24 public upperTick;
@@ -38,41 +36,35 @@ contract RangePool is Ownable {
   uint256 public totalClaimedFees0;
   uint256 public totalClaimedFees1;
 
-  mapping(address => bool) public isRegistered;
+  // mapping(address => bool) public isRegistered;
 
-  event Mint(address indexed recipient, uint256 tokenId);
+  event PositionMinted(address indexed recipient, uint256 tokenId);
   event LiquidityIncreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
-  event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1, uint128 liquidity);
-  event FeesCollected(address indexed recipient, uint256 amountCollected0, uint256 amountCollected1);
-  event DCA(address indexed recipient, uint256 amount);
+  event LiquidityDecreased(address indexed recipient, uint256 amount0, uint256 amount1);
+  event FeesCollected(
+    address indexed recipient,
+    address indexed token0,
+    address indexed token1,
+    uint256 amountCollected0,
+    uint256 amountCollected1
+  );
 
-  modifier onlyAllowed() {
-    require(msg.sender == owner() || isRegistered[msg.sender] == true, 'RangePool:NA'); // Caller not alloed
-    _;
-  }
+  constructor(DeploymentParameters memory params) {
+    uniswapFactory = params.uniswapFactory;
+    uniswapRouter = params.uniswapRouter;
+    positionManager = INonfungiblePositionManager(params.positionManager);
 
-  constructor(
-    address _tokenA,
-    address _tokenB,
-    uint24 _fee,
-    uint256 _lowerLimitInTokenB,
-    uint256 _upperLimitInTokenB
-  ) {
-    rangePoolFactory = RangePoolFactory(msg.sender);
-    uniswapFactory = rangePoolFactory.uniswapFactory();
-    uniswapRouter = rangePoolFactory.uniswapRouter();
-    positionManager = rangePoolFactory.positionManager();
+    pool = IUniswapV3Pool(Helper.getPoolAddress(params.tokenA, params.tokenB, params.fee, params.uniswapFactory));
 
-    pool = IUniswapV3Pool(Helper.getPoolAddress(_tokenA, _tokenB, _fee, address(rangePoolFactory.uniswapFactory())));
+    (lowerTick, upperTick) = Helper.validateAndConvertLimits(
+      pool,
+      params.tokenB,
+      params.lowerLimitInTokenB,
+      params.upperLimitInTokenB
+    );
 
-    (lowerTick, upperTick) = Helper.validateAndConvertLimits(pool, _tokenB, _lowerLimitInTokenB, _upperLimitInTokenB);
-
-    ERC20(pool.token0()).safeApprove(address(rangePoolFactory.positionManager()), type(uint256).max);
-    ERC20(pool.token1()).safeApprove(address(rangePoolFactory.positionManager()), type(uint256).max);
-  }
-
-  function toggleStrategy(address strategy) external onlyOwner {
-    isRegistered[strategy] = !isRegistered[strategy];
+    ERC20(pool.token0()).safeApprove(address(params.positionManager), type(uint256).max);
+    ERC20(pool.token1()).safeApprove(address(params.positionManager), type(uint256).max);
   }
 
   function addLiquidity(
@@ -81,7 +73,7 @@ contract RangePool is Ownable {
     uint16 slippage
   )
     external
-    onlyAllowed
+    onlyOwner
     returns (
       uint128 liquidityAdded,
       uint256 amountAdded0,
@@ -90,37 +82,48 @@ contract RangePool is Ownable {
   {
     ERC20(pool.token0()).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(pool.token1()).safeTransferFrom(msg.sender, address(this), amount1);
+
     (liquidityAdded, amountAdded0, amountAdded1) = _addLiquidity(msg.sender, amount0, amount1, slippage);
   }
 
-  function decreaseLiquidity(uint128 liquidity, uint16 slippage)
-    external
-    onlyOwner
-    returns (uint256 amountDecreased0, uint256 amountDecreased1)
-  {
-    if (uint256(liquidity) == lpToken.balanceOf(msg.sender)) {
-      (amountDecreased0, amountDecreased1) = _removeLiquidity(msg.sender, msg.sender, slippage);
-    } else {
-      (amountDecreased0, amountDecreased1) = _decreaseLiquidity(msg.sender, liquidity, slippage);
-      _collect(msg.sender, uint128(amountDecreased0), uint128(amountDecreased1));
-    }
-  }
-
-  function removeLiquidity(uint16 slippage)
+  function removeLiquidity(uint128 liquidityAmount, uint16 slippage)
     external
     onlyOwner
     returns (uint256 amountRemoved0, uint256 amountRemoved1)
   {
-    (amountRemoved0, amountRemoved1) = _removeLiquidity(msg.sender, msg.sender, slippage);
+    uint128 remainingLiquidity = Helper.positionLiquidity(positionManager, tokenId);
+
+    liquidityAmount = liquidityAmount > remainingLiquidity ? remainingLiquidity : liquidityAmount;
+
+    (amountRemoved0, amountRemoved1) = _decreaseLiquidity(msg.sender, liquidityAmount, slippage);
+
+    (uint256 collectedFees0, uint256 collectedFees1) = (liquidityAmount == remainingLiquidity)
+      ? Helper.fees(positionManager, tokenId)
+      : (0, 0);
+
+    _collect(msg.sender, uint128(amountRemoved0.add(collectedFees0)), uint128(amountRemoved1.add(collectedFees1)));
+
+    emit FeesCollected(msg.sender, pool.token0(), pool.token1(), collectedFees0, collectedFees1);
   }
 
   function claimNFT() external onlyOwner {
-    lpToken.burn(msg.sender, lpToken.balanceOf(msg.sender));
     positionManager.safeTransferFrom(address(this), msg.sender, tokenId);
   }
 
-  function collectFees() external onlyAllowed returns (uint256 amountCollected0, uint256 amountCollected1) {
-    (amountCollected0, amountCollected1) = _collectFees(msg.sender);
+  function collectFees()
+    external
+    onlyOwner
+    returns (
+      address tokenCollected0,
+      address tokenCollected1,
+      uint256 collectedFees0,
+      uint256 collectedFees1
+    )
+  {
+    (collectedFees0, collectedFees1) = _collectFees(msg.sender);
+    tokenCollected0 = pool.token0();
+    tokenCollected1 = pool.token1();
+    emit FeesCollected(msg.sender, tokenCollected0, tokenCollected1, collectedFees0, collectedFees1);
   }
 
   function updateRange(
@@ -138,8 +141,15 @@ contract RangePool is Ownable {
     )
   {
     (lowerTick, upperTick) = Helper.validateAndConvertLimits(pool, tokenA, lowerLimitA, upperLimitA);
-    (uint256 collected0, uint256 collected1) = _removeLiquidity(msg.sender, address(this), slippage);
+
+    (uint256 collected0, uint256 collected1) = _decreaseLiquidity(
+      address(this),
+      Helper.positionLiquidity(positionManager, tokenId),
+      slippage
+    );
+
     tokenId = 0;
+
     (addedLiquidity, addedAmount0, addedAmount1) = _addLiquidity(msg.sender, collected0, collected1, slippage);
   }
 
@@ -163,9 +173,7 @@ contract RangePool is Ownable {
         amount0: _amount0,
         amount1: _amount1,
         slippage: _slippage
-      }),
-      address(uniswapFactory),
-      address(uniswapRouter)
+      })
     );
 
     if (tokenId == 0) {
@@ -220,10 +228,8 @@ contract RangePool is Ownable {
 
     (_generatedTokenId, _liquidityAdded, _amountAdded0, _amountAdded1) = positionManager.mint(params);
 
-    if (address(lpToken) == address(0)) lpToken = new LiquidityProviderToken(_generatedTokenId);
-    lpToken.mint(_account, _liquidityAdded);
     emit LiquidityIncreased(_account, _amountAdded0, _amountAdded1, _liquidityAdded);
-    emit Mint(_account, _generatedTokenId);
+    emit PositionMinted(_account, _generatedTokenId);
   }
 
   function _increaseLiquidity(
@@ -251,16 +257,15 @@ contract RangePool is Ownable {
 
     (_liquidityIncreased, _amountIncreased0, _amountIncreased1) = positionManager.increaseLiquidity(params);
 
-    lpToken.mint(_recipient, uint256(_liquidityIncreased));
     emit LiquidityIncreased(_recipient, _amountIncreased0, _amountIncreased1, _liquidityIncreased);
   }
 
   function _decreaseLiquidity(
-    address _account,
+    address _recipient,
     uint128 _liquidity,
     uint16 _slippage
   ) internal returns (uint256 _amountDecreased0, uint256 _amountDecreased1) {
-    require(lpToken.balanceOf(_account) >= _liquidity, 'RangePool: Not enough liquidity');
+    require(Helper.positionLiquidity(positionManager, tokenId) >= _liquidity, 'RangePool: Not enough liquidity');
 
     (uint256 _expectedAmount0, uint256 _expectedAmount1) = Helper.getAmountsForLiquidity(
       Helper.oracleSqrtPricex96(pool, oracleSeconds),
@@ -278,34 +283,9 @@ contract RangePool is Ownable {
         deadline: block.timestamp
       });
 
-    lpToken.burn(_account, uint256(_liquidity));
-
     (_amountDecreased0, _amountDecreased1) = positionManager.decreaseLiquidity(params);
-  }
 
-  function _removeLiquidity(
-    address _deductAccount,
-    address _recipient,
-    uint16 _slippage
-  ) internal returns (uint256 totalRemoved0, uint256 totalRemoved1) {
-    (uint256 amountRemoved0, uint256 amountRemoved1) = _decreaseLiquidity(
-      _deductAccount,
-      uint128(lpToken.balanceOf(msg.sender)),
-      _slippage
-    );
-
-    (uint256 feeAmount0, uint256 feeAmount1) = Helper.fees(positionManager, tokenId);
-
-    totalClaimedFees0 = totalClaimedFees0.add(feeAmount0);
-    totalClaimedFees1 = totalClaimedFees1.add(feeAmount1);
-
-    (totalRemoved0, totalRemoved1) = _collect(
-      _recipient,
-      uint128(amountRemoved0.add(feeAmount0)),
-      uint128(amountRemoved1.add(feeAmount1))
-    );
-
-    emit FeesCollected(_recipient, feeAmount0, feeAmount1);
+    emit LiquidityDecreased(_recipient, _amountDecreased0, _amountDecreased1);
   }
 
   function _collect(
@@ -323,14 +303,14 @@ contract RangePool is Ownable {
     (amountCollected0, amountCollected1) = positionManager.collect(params);
   }
 
-  function _collectFees(address _recipient) internal returns (uint256 amountCollected0, uint256 amountCollected1) {
+  function _collectFees(address _recipient) internal returns (uint256 collectedFees0, uint256 collectedFees1) {
     (uint256 feeAmount0, uint256 feeAmount1) = Helper.fees(positionManager, tokenId);
-    if (feeAmount0.add(feeAmount1) == 0) return (amountCollected0, amountCollected1);
 
-    (amountCollected0, amountCollected1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
-    totalClaimedFees0 = totalClaimedFees0.add(amountCollected0);
-    totalClaimedFees1 = totalClaimedFees1.add(amountCollected1);
+    if (feeAmount0.add(feeAmount1) == 0) return (0, 0);
 
-    emit FeesCollected(_recipient, amountCollected0, amountCollected1);
+    (collectedFees0, collectedFees1) = _collect(_recipient, uint128(feeAmount0), uint128(feeAmount1));
+
+    totalClaimedFees0 = totalClaimedFees0.add(collectedFees0);
+    totalClaimedFees1 = totalClaimedFees1.add(collectedFees1);
   }
 }

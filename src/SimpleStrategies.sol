@@ -16,7 +16,14 @@ contract SimpleStrategies {
   using SafeERC20 for ERC20;
   using SafeMath for uint256;
 
-  event Compounded(address indexed receiver, uint256 amount0, uint256 amount1, uint128 liquidity);
+  event Compounded(
+    address indexed receiver,
+    address indexed token0,
+    address indexed token1,
+    uint256 amount0,
+    uint256 amount1,
+    uint128 liquidity
+  );
   event Stacked(address indexed receiver, uint256 amountStacked);
 
   modifier onlyOwner(RangePool rangePool) {
@@ -33,10 +40,10 @@ contract SimpleStrategies {
       uint256 amountCompounded1
     )
   {
-    (uint256 amountCollected0, uint256 amountCollected1) = rangePool.collectFees();
+    (address token0, address token1, uint256 amountCollected0, uint256 amountCollected1) = rangePool.collectFees();
 
-    _maxApprove(rangePool, rangePool.pool().token0(), amountCollected0);
-    _maxApprove(rangePool, rangePool.pool().token1(), amountCollected1);
+    _maxApprove(address(rangePool), token0, amountCollected0);
+    _maxApprove(address(rangePool), token1, amountCollected1);
 
     (addedLiquidity, amountCompounded0, amountCompounded1) = rangePool.addLiquidity(
       amountCollected0,
@@ -44,9 +51,9 @@ contract SimpleStrategies {
       slippage
     );
 
-    ERC20(rangePool.lpToken()).safeTransfer(msg.sender, addedLiquidity);
+    // ERC20(rangePool.lpToken()).safeTransfer(msg.sender, addedLiquidity);
 
-    emit Compounded(msg.sender, amountCollected0, amountCollected1, slippage);
+    emit Compounded(msg.sender, token0, token1, amountCollected0, amountCollected1, slippage);
   }
 
   function stack(
@@ -59,7 +66,7 @@ contract SimpleStrategies {
       'SimpleStrategies:NA' //  Can only stack tokens belonging to the pool
     );
 
-    (uint256 amountCollected0, uint256 amountCollected1) = rangePool.collectFees();
+    (, , uint256 amountCollected0, uint256 amountCollected1) = rangePool.collectFees();
 
     address tokenIn = (tokenToStack == rangePool.pool().token0())
       ? rangePool.pool().token1()
@@ -79,8 +86,8 @@ contract SimpleStrategies {
         slippage: slippage,
         oracleSeconds: rangePool.oracleSeconds()
       }),
-      address(rangePool.rangePoolFactory().uniswapFactory()),
-      address(rangePool.rangePoolFactory().uniswapRouter())
+      rangePool.uniswapFactory(),
+      rangePool.uniswapRouter()
     );
 
     amountStacked = Helper.safeBalanceTransfer(
@@ -94,12 +101,12 @@ contract SimpleStrategies {
   }
 
   function _maxApprove(
-    RangePool rangePool,
+    address spender,
     address token,
     uint256 minimumAmount
   ) private {
-    if (ERC20(token).allowance(address(this), address(rangePool)) < minimumAmount) {
-      ERC20(token).safeApprove(address(rangePool), type(uint256).max);
+    if (ERC20(token).allowance(address(this), spender) < minimumAmount) {
+      ERC20(token).safeApprove(spender, type(uint256).max);
     }
   }
 }

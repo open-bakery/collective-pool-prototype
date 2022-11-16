@@ -6,7 +6,7 @@ deploy-testnet:; forge script script/DevDeploy.s.sol:Deploy --fork-url $(FORK_RP
 
 trace:; forge test -vv
 
-testUnit:; forge test -vvv --mc UnitTest* --fork-url $(FORK_RPC_URL)
+testRangePool:; forge test -vvv --mc RangePoolTest* --fork-url $(FORK_RPC_URL)
 
 testLocal:; forge test -vvv --match-test testAnvil*
 
@@ -14,8 +14,8 @@ testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(FORK_R
 
 testPositionManager:; forge test -vvv --mc RangePoolPositionManager* --fork-url $(FORK_RPC_URL)
 
-testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
-# testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL) --gas-report
+# testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
+testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL) --gas-report
 
 testArb:; forge test -vvv --mt testArbitrum*  --fork-url $(ARBITRUM_RPC_ALCHEMY)
 

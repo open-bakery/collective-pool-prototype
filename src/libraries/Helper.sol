@@ -47,11 +47,10 @@ library Helper {
     return Swapper.swap(params, uniswapFactory, router);
   }
 
-  function convertToRatio(
-    ConvertRatioParams memory params,
-    address uniswapFactory,
-    address router
-  ) external returns (uint256 convertedAmount0, uint256 convertedAmount1) {
+  function convertToRatio(ConvertRatioParams memory params)
+    external
+    returns (uint256 convertedAmount0, uint256 convertedAmount1)
+  {
     (uint256 targetAmount0, uint256 targetAmount1) = RatioCalculator.calculateRatio(
       Conversion.sqrtPriceX96(params.rangePool.pool()),
       params.rangePool.pool().liquidity(),
@@ -81,8 +80,8 @@ library Helper {
         slippage: params.slippage,
         oracleSeconds: params.rangePool.oracleSeconds()
       }),
-      uniswapFactory,
-      router
+      params.rangePool.uniswapFactory(),
+      params.rangePool.uniswapRouter()
     );
 
     (convertedAmount0, convertedAmount1) = (zeroForOne)
@@ -91,6 +90,14 @@ library Helper {
 
     assert(ERC20(params.rangePool.pool().token0()).balanceOf(params.recipient) >= convertedAmount0);
     assert(ERC20(params.rangePool.pool().token1()).balanceOf(params.recipient) >= convertedAmount1);
+  }
+
+  function positionLiquidity(INonfungiblePositionManager positionManager, uint256 tokenId)
+    external
+    view
+    returns (uint128 liquidity)
+  {
+    (, , , , , , , liquidity, , , , ) = positionManager.positions(tokenId);
   }
 
   function safeBalanceTransfer(

@@ -2,11 +2,10 @@
 pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
-import '../src/RangePool.sol';
-import '../src/logs/Logs.sol';
 import '../src/Lens.sol';
+import '../src/utility/Utils.sol';
 
-contract LogsTest is Test, Logs {
+abstract contract LogsTest is Utils {
   Lens public lens;
 
   constructor() {

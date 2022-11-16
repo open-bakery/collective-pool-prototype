@@ -3,17 +3,30 @@ pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
 import 'forge-std/Test.sol';
+
+import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
+import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
+import '@openzeppelin/contracts/math/SafeMath.sol';
+
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
-import '../src/RangePool.sol';
+import '../RangePoolManager.sol';
+import '../RangePoolFactory.sol';
+import '../RangePool.sol';
+import '../SimpleStrategies.sol';
 
-contract LocalVars is Test {
+abstract contract LocalVars is Test {
   IUniswapV3Factory public uniswapFactory = IUniswapV3Factory(vm.envAddress('UNISWAP_V3_FACTORY'));
   INonfungiblePositionManager public positionManager = INonfungiblePositionManager(vm.envAddress('UNISWAP_V3_NFPM'));
   ISwapRouter public uniswapRouter = ISwapRouter(vm.envAddress('UNISWAP_V3_ROUTER'));
+
+  RangePoolFactory public rangePoolFactory;
+  RangePoolManager public rangePoolManager;
+  RangePool public rangePool;
+  SimpleStrategies public simpleStrategies;
 
   address public ARB_WETH = vm.envAddress('ARB_WETH');
   address public ARB_USDC = vm.envAddress('ARB_USDC');
