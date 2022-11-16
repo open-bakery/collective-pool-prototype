@@ -48,15 +48,24 @@ echo "$indexImport
 
 $indexExport" > "$ABIS_DIR/index.ts"
 
-echo "export default `cat $DIST_DIR/local.json` as const;" > "$DIST_DIR/local.ts";
+echo "{
+`cat $DIST_DIR/local.tmp`
+  \"dummy\": \"prop\"
+}" > "$DIST_DIR/local.json";
 
-SM00T_DIR="$BASEDIR/../sm00th"
-cp -r $ABIS_DIR/*.ts $SM00T_DIR/@app/ui/abis
-cp $DIST_DIR/local.ts $SM00T_DIR/@app/ui/const
-cp $DIST_DIR/local.json $SM00T_DIR/@app/subgraph/contracts
-cp -r $ABIS_DIR/*.json $SM00T_DIR/@app/subgraph/contracts/abis
+echo "export default {
+`cat $DIST_DIR/local.tmp`
+} as const;" > "$DIST_DIR/local.ts";
+
+SM00TH_DIR="$BASEDIR/../sm00th"
+cp -r $ABIS_DIR/*.ts $SM00TH_DIR/@app/ui/abis
+cp $DIST_DIR/local.ts $SM00TH_DIR/@app/ui/const
+cp $DIST_DIR/local.json $SM00TH_DIR/@app/subgraph/contracts
+cp -r $ABIS_DIR/*.json $SM00TH_DIR/@app/subgraph/contracts/abis
 
 FACTORY_ADDRESS=`jq .uniFactory -r dist/local.json`
+LENS_ADDRESS=`jq .lens -r dist/local.json`
 ADDR=$FACTORY_ADDRESS yq -i '.dataSources[0].source.address = strenv(ADDR)' ../uniswap-v3-subgraph/subgraph.yaml
 ADDR=`jq .positionManager -r dist/local.json` yq -i '.dataSources[1].source.address = strenv(ADDR)' ../uniswap-v3-subgraph/subgraph.yaml
-echo "export const FACTORY_ADDRESS = '$FACTORY_ADDRESS'" > ../uniswap-v3-subgraph/src/utils/factoryAddress.ts;
+echo "export const FACTORY_ADDRESS = '$FACTORY_ADDRESS';" > ../uniswap-v3-subgraph/src/utils/factoryAddress.ts
+echo "export const LENS_ADDRESS = '$LENS_ADDRESS';" > $SM00TH_DIR/@app/subgraph/src/lensAddress.ts

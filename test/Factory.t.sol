@@ -3,7 +3,7 @@ pragma solidity >=0.5.0 <0.8.0;
 
 import '../src/utility/Utils.sol';
 
-contract ContractTest is Utils {
+contract FactoryTest is Utils {
   function testFactoryHasAllPropertiesWhenDeployed() public {
     address positionManager = makeAddr('positionManager');
     address router = makeAddr('router');
