@@ -2,9 +2,9 @@
 pragma solidity >=0.6.0 <0.8.0;
 pragma abicoder v2;
 
-import '../src/utility/Utils.sol';
+import '../src/utility/TestHelpers.sol';
 
-contract SimpleStrategiesTest is Utils {
+contract SimpleStrategiesTest is TestHelpers {
   function setUp() public {}
 
   function testExample() public {

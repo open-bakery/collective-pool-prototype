@@ -2,16 +2,16 @@
 pragma solidity >=0.5.0 <0.8.14;
 pragma abicoder v2;
 
-import './LocalVars.sol';
+import './DeployHelpers.sol';
 import '../logs/Logs.sol';
 
-abstract contract Utils is LocalVars, Logs {
+abstract contract TestHelpers is DeployHelpers, Logs {
   function deployBase() public {
     rangePoolFactory = new RangePoolFactory(address(uniswapFactory), address(uniswapRouter), address(positionManager));
     simpleStrategies = new SimpleStrategies();
   }
 
-  function simpleAmount(address token, uint256 amount) external view returns (uint256) {
+  function simpleAmount(uint256 amount, address token) internal view returns (uint256) {
     return amount * (10**ERC20(token).decimals());
   }
 
@@ -54,8 +54,9 @@ abstract contract Utils is LocalVars, Logs {
     uint256 receivedB;
 
     receivedB = swap(tokenA, tokenB, fee, amountA);
-
+    uint256 interval = 60 seconds;
     for (uint8 i = 0; i < swaps; i++) {
+      skip(interval);
       receivedA = swap(tokenB, tokenA, fee, receivedB);
       receivedB = swap(tokenA, tokenB, fee, receivedA);
     }

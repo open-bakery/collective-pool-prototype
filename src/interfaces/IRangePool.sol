@@ -10,6 +10,7 @@ interface IRangePool {
     address tokenA;
     address tokenB;
     uint24 fee;
+    uint32 oracleSeconds;
     uint256 lowerLimitInTokenB;
     uint256 upperLimitInTokenB;
   }

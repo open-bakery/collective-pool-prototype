@@ -2,20 +2,16 @@
 pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
-import '../src/libraries/Helper.sol';
-
 import '../src/interfaces/IRangePool.sol';
 
 import '../src/utility/TestHelpers.sol';
 import './Logs.t.sol';
 
-contract RangePoolTest is LogsTest {
+contract ForkRangePoolTest is TestHelpers, LogsTest {
   using PositionValue for INonfungiblePositionManager;
   using SafeMath for uint256;
   using SafeMath for uint128;
   using SafeERC20 for ERC20;
-
-  IUniswapV3Pool deployedPool;
 
   address public tokenA;
   address public tokenB;
@@ -25,48 +21,61 @@ contract RangePoolTest is LogsTest {
   uint256 public upperLimitB;
 
   function setUp() public {
-    lens = new Lens();
-
-    deployAndDistributeTokens();
-    deployUniswapBase(tokens.weth);
-    initPoolProps();
-    deployedPool = createUniswapPool(poolProps[1], 10_000, 10_500_000, 1500);
-    tokenA = poolProps[1].tokenA; // weth
-    tokenB = poolProps[1].tokenB; // dai
-    fee = poolProps[1].fee;
+    tokenA = USDC;
+    tokenB = WETH;
+    fee = 500;
     oracleSeconds = 60;
-    lowerLimitB = simpleAmount(1_000, tokenB);
-    upperLimitB = simpleAmount(2_000, tokenB);
+    lowerLimitB = 0.001 ether;
+    upperLimitB = 0.0005 ether;
+    lens = new Lens();
   }
 
-  function testRangePool() public {
-    uint16 slippage = 10_00;
+  function testArbitrum() public {
+    uint16 slippage = 100_00;
     initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
-    // Performs swap to record price to Oracle.
-    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
-    addLiquidity(simpleAmount(20_000, tokenB), 5 ether, slippage);
-    increaseLiquidity(simpleAmount(4_000, tokenB), 0, slippage);
-    removeLiquidity(uint128(_getLiquidity(rangePool).div(100)), slippage);
-    performSwaps(tokenA, simpleAmount(10_000, tokenA), tokenB, fee, 10);
-    logPrices(rangePool);
+    addLiquidity(20_000_000000, 5 ether, slippage);
+    increaseLiquidity(4_000_000000, 1 ether, slippage);
+    removeLiquidity(
+      uint128(Helper.positionLiquidity(rangePool.positionManager(), rangePool.tokenId()).div(2)),
+      slippage
+    );
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
     collectFees();
-    performSwaps(tokenA, simpleAmount(10_000, tokenA), tokenB, fee, 10);
-    updateRange(tokenB, simpleAmount(800, tokenB), simpleAmount(1_500, tokenB), slippage);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    // compound(slippage);
+    // performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    // stack(tokenA, slippage);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
   }
 
-  function testPoolConstruct() public {
-    uint256 lowerLimit = 0.001 ether;
-    uint256 upperLimit = 0.0005 ether;
-    initialize(tokenB, tokenA, fee, 60, lowerLimit, upperLimit);
-    (int24 lowerTick, int24 upperTick) = Helper.validateAndConvertLimits(
-      rangePool.pool(),
-      tokenA,
-      lowerLimit,
-      upperLimit
-    );
+  function testFullLogs() public {
+    initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
+    addLiquidity(20_000_000000, 5 ether, 1_00);
+    logPrincipal(rangePool);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    logUnclaimedFees(rangePool);
+    logAveragePrices(rangePool);
+    logTokenAmountsAtLimits(rangePool);
+    logPrices(rangePool);
+    logOraclePrices(rangePool, 60);
+    logLimits(rangePool);
+  }
 
-    assertTrue(rangePool.lowerTick() == lowerTick);
-    assertTrue(rangePool.upperTick() == upperTick);
+  function testMainnet() public {
+    uint16 slippage = 1_00;
+    initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
+    addLiquidity(20_000_000000, 5 ether, slippage);
+    increaseLiquidity(4_000_000000, 1 ether, slippage);
+    removeLiquidity(uint128(_getLiquidity(rangePool).div(2)), slippage);
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    collectFees();
+    performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
+    updateRange(MAIN_USDC, 1200_000000, 1800_000000, slippage);
+  }
+
+  function testPoolConstruct() internal {
+    initialize(MAIN_WETH, MAIN_USDC, 500, 60, 1000_000000, 2000_000000);
+    logLimits(rangePool);
   }
 
   function initialize(
@@ -138,7 +147,7 @@ contract RangePoolTest is LogsTest {
     logr(
       'testIncreaseLiquidity()',
       ['liquidityAdded', 'amount0Added', 'amount1Added', '0', '0', '0'],
-      [uint256(liquidityAdded), amount0Added, amount1Added, 0, 0, 0]
+      [uint256(iLiquidity), amount0Added, amount1Added, 0, 0, 0]
     );
 
     assertTrue(

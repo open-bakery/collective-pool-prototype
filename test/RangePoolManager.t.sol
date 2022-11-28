@@ -2,12 +2,13 @@
 pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
-import '../src/utility/Utils.sol';
+import '../src/utility/TestHelpers.sol';
 
-contract RangePoolManagerTest is Utils {
+contract RangePoolManagerTest is TestHelpers {
   address public tokenA;
   address public tokenB;
   uint24 public fee;
+  uint32 public oracleSeconds;
   uint256 public lowerLimitB;
   uint256 public upperLimitB;
 
@@ -18,6 +19,7 @@ contract RangePoolManagerTest is Utils {
     tokenA = WETH;
     tokenB = USDC;
     fee = 500;
+    oracleSeconds = 60;
     lowerLimitB = 1_000_000000;
     upperLimitB = 2_000_000000;
   }
@@ -29,7 +31,9 @@ contract RangePoolManagerTest is Utils {
   }
 
   function testAddLiquidityDirectlyToRangePool() public {
-    rangePool = RangePool(rangePoolManager.createRangePool(tokenA, tokenB, fee, lowerLimitB, upperLimitB, false));
+    rangePool = RangePool(
+      rangePoolManager.createRangePool(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB, false)
+    );
     _approveAndDeal(tokenA, tokenB, 1 ether, 1_000_000000, address(rangePool));
     // rangePool.addLiquidity();
   }

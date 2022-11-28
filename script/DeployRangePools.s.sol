@@ -18,8 +18,8 @@ contract DeployRangePools is DeployHelpers, ScriptHelpers {
   function run() external {
     // the tokens were deployed by the other script. Need to reload them before initPoolProps.
     tokens = Tokens({ weth: readAddress('weth'), dai: readAddress('dai'), usdc: readAddress('usdc') });
-    factory = IUniswapV3Factory(readAddress('uniFactory'));
-    router = ISwapRouter(readAddress('router'));
+    uniswapFactory = IUniswapV3Factory(readAddress('uniswapFactory'));
+    uniswapRouter = ISwapRouter(readAddress('uniswapRouter'));
     positionManager = INonfungiblePositionManager(readAddress('positionManager'));
 
     vm.startBroadcast();
@@ -46,6 +46,6 @@ contract DeployRangePools is DeployHelpers, ScriptHelpers {
     vm.stopBroadcast();
 
     outputProp('lens', vm.toString(address(lens)));
-    outputProp('factory', vm.toString(address(rpFactory)));
+    outputProp('rangePoolFactory', vm.toString(address(rangePoolFactory)));
   }
 }

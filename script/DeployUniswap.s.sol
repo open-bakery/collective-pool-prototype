@@ -25,7 +25,7 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
 
     uint160 limit = pool.token0() == tokenIn ? MIN_SQRT_RATIO : MAX_SQRT_RATIO;
 
-    amountOut = router.exactInputSingle(
+    amountOut = uniswapRouter.exactInputSingle(
       ISwapRouter.ExactInputSingleParams({
         tokenIn: tokenIn,
         tokenOut: tokenOut,
@@ -42,13 +42,13 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
   function run() external {
     vm.startBroadcast();
 
-    initDeployHelpers();
     deployAndDistributeTokens();
     initPoolProps();
-    deployUniswapBase();
+    deployUniswapBase(tokens.weth);
 
     // let's deploy a few pools here. we'll need them later
     IUniswapV3Pool pool1 = createUniswapPool(poolProps[1], 100, 150000, 1500);
+    pool1; // clear warning
     //    IUniswapV3Pool pool2 = createUniswapPool(poolProps[1], 100, 150000, 1500);
 
     // !!! just a dummy transaction to make sure blocks are written properly...
@@ -60,7 +60,7 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
     outputProp('startBlock', vm.toString(block.number));
     outputProp('network', NETWORK);
 
-    outputProp('uniFactory', vm.toString(address(factory)));
+    outputProp('uniFactory', vm.toString(address(uniswapFactory)));
     outputProp('positionManager', vm.toString(address(positionManager)));
 
     outputProp('weth', vm.toString(tokens.weth));
@@ -72,8 +72,8 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
     writeAddress('dai', tokens.dai);
     //    writeAddress('usdc', tokens.usdc);
 
-    writeAddress('uniFactory', address(factory));
-    writeAddress('router', address(router));
+    writeAddress('uniswapFactory', address(uniswapFactory));
+    writeAddress('uniswapRouter', address(uniswapRouter));
     writeAddress('positionManager', address(positionManager));
   }
 }

@@ -2,16 +2,9 @@
 pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
-import '../src/Lens.sol';
-import '../src/utility/Utils.sol';
+import '../src/utility/TestHelpers.sol';
 
-abstract contract LogsTest is Utils {
-  Lens public lens;
-
-  constructor() {
-    lens = new Lens();
-  }
-
+abstract contract LogsTest is TestHelpers {
   function logPrincipal(RangePool rangePool) public view {
     (uint256 amount0, uint256 amount1) = lens.principal(rangePool);
     logr('logPrincipal()', ['amount0', 'amount1', '0', '0', '0', '0'], [uint256(amount0), amount1, 0, 0, 0, 0]);

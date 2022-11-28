@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.5.0 <0.8.0;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
-
 import '@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol';
 
 import './RangePoolFactory.sol';
@@ -45,11 +41,19 @@ contract RangePoolManager is Ownable {
     address tokenA,
     address tokenB,
     uint24 fee,
+    uint32 oracleSeconds,
     uint256 lowerLimitInTokenB,
     uint256 upperLimitInTokenB,
     bool privatePool
   ) external returns (address rangePool) {
-    rangePool = rangePoolFactory.deployRangePool(tokenA, tokenB, fee, lowerLimitInTokenB, upperLimitInTokenB);
+    rangePool = rangePoolFactory.deployRangePool(
+      tokenA,
+      tokenB,
+      fee,
+      oracleSeconds,
+      lowerLimitInTokenB,
+      upperLimitInTokenB
+    );
     if (privatePool) poolController[rangePool] = msg.sender;
     emit RangePoolCreated(rangePool);
   }

@@ -6,46 +6,19 @@ import '@uniswap/v3-periphery/contracts/SwapRouter.sol' as SR;
 import '@uniswap/v3-periphery/contracts/NonfungiblePositionManager.sol' as NPM;
 import '@uniswap/v3-periphery/contracts/NonfungibleTokenPositionDescriptor.sol';
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
+import '@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol';
 
-import '../RangePool.sol';
-import '../RangePoolFactory.sol';
-import '../Lens.sol';
-
-import './Token.sol';
 import './DevConstants.sol';
+import './LocalVars.sol';
 
 pragma abicoder v2;
 
-contract DeployHelpers is DevConstants {
-  struct PoolProps {
-    address tokenA;
-    address tokenB;
-    uint24 fee;
-  }
-
-  struct Tokens {
-    address weth;
-    address dai;
-    address usdc;
-    //    address gmx;
-  }
-
-  Tokens tokens;
-  IUniswapV3Factory factory;
-  INonfungiblePositionManager positionManager;
-  ISwapRouter router;
-
-  RangePoolFactory rpFactory;
-  Lens lens;
-
+abstract contract DeployHelpers is DevConstants, LocalVars {
   mapping(uint24 => int24) public TICK_SPACING;
 
   mapping(uint256 => PoolProps) public poolProps;
 
-  function initDeployHelpers() public {
+  function initDeployHelpers() private {
     TICK_SPACING[FEE_0_05] = TICK_SPACING_0_05;
     TICK_SPACING[FEE_0_30] = TICK_SPACING_0_30;
     TICK_SPACING[FEE_1_00] = TICK_SPACING_1_00;
@@ -54,48 +27,47 @@ contract DeployHelpers is DevConstants {
   function initPoolProps() public {
     poolProps[1] = PoolProps({ tokenA: tokens.weth, tokenB: tokens.dai, fee: FEE_0_30 });
     poolProps[2] = PoolProps({ tokenA: tokens.weth, tokenB: tokens.dai, fee: FEE_1_00 });
-    //    poolProps[3] = PoolProps({ tokenA: tokens.usdc, tokenB: tokens.dai, fee: FEE_0_05 });
+    poolProps[3] = PoolProps({ tokenA: tokens.usdc, tokenB: tokens.weth, fee: FEE_0_05 });
   }
 
   function deployAndDistributeTokens() internal {
     tokens.weth = deployAndDistributeToken('WETH', 18);
     tokens.dai = deployAndDistributeToken('DAI', 18);
-    //    tokens.usdc = deployAndDistributeToken('USDC', 6);
-    //    tokens.gmx = deployAndDistributeToken('GMX');
+    tokens.usdc = deployAndDistributeToken('USDC', 6);
   }
 
   function deployAndDistributeToken(string memory symbol, uint8 decimals) internal returns (address) {
-    Token t = new Token(symbol, symbol, decimals, a(1_000_000, decimals));
+    Token t = new Token(symbol, symbol, decimals, a(100_000_000, decimals));
     distributeToken(t);
     return address(t);
   }
 
   function distributeToken(Token t) private {
-    t.transfer(ALICE, a(10_000, t.decimals()));
-    t.transfer(BOB, a(10_000, t.decimals()));
-    t.transfer(CHARLIE, a(10_000, t.decimals()));
+    t.transfer(ALICE, a(100_000, t.decimals()));
+    t.transfer(BOB, a(100_000, t.decimals()));
+    t.transfer(CHARLIE, a(100_000, t.decimals()));
   }
 
-  function deployUniswapBase() public {
-    require(tokens.weth != address(0), 'WETH needs to be deployed');
+  function deployUniswapBase(address weth) public {
+    initDeployHelpers();
+    
+    require(weth != address(0), 'WETH needs to be deployed');
     console.log('deployUniswapBase msg.sender', msg.sender);
 
-    factory = new UniswapV3Factory();
-    NonfungibleTokenPositionDescriptor tokenPositionDescriptor = new NonfungibleTokenPositionDescriptor(
-      tokens.weth,
-      'ETH'
-    );
+    uniswapFactory = new UniswapV3Factory();
+    console.log('uniswapFactory: ', address(uniswapFactory));
+    NonfungibleTokenPositionDescriptor tokenPositionDescriptor = new NonfungibleTokenPositionDescriptor(weth, 'ETH');
     positionManager = new NPM.NonfungiblePositionManager(
-      address(factory),
-      tokens.weth,
+      address(uniswapFactory),
+      weth,
       address(tokenPositionDescriptor)
     );
-    router = new SR.SwapRouter(address(factory), tokens.weth);
+    uniswapRouter = new SR.SwapRouter(address(uniswapFactory), weth);
   }
 
   function deployOurBase() public {
     lens = new Lens();
-    rpFactory = new RangePoolFactory(address(factory), address(router), address(positionManager));
+    rangePoolFactory = new RangePoolFactory(address(uniswapFactory), address(uniswapRouter), address(positionManager));
   }
 
   function createUniswapPool(
@@ -110,7 +82,7 @@ contract DeployHelpers is DevConstants {
       : (Token(props.tokenB), Token(props.tokenA));
 
     // create
-    IUniswapV3Pool pool = IUniswapV3Pool(factory.createPool(address(token0), address(token1), props.fee));
+    IUniswapV3Pool pool = IUniswapV3Pool(uniswapFactory.createPool(address(token0), address(token1), props.fee));
 
     // approve
     Token(props.tokenA).approve(address(pool), maxAllowance);
@@ -126,7 +98,7 @@ contract DeployHelpers is DevConstants {
     pool.initialize(Conversion.uintToSqrtPriceX96(initPrice, token0.decimals()));
 
     (int24 tickLower, int24 tickUpper) = Conversion.convertLimitsToTicks(
-      (initPrice * 5) / 10,
+      initPrice / 2,
       initPrice * 2,
       TICK_SPACING[props.fee],
       token0.decimals()
@@ -138,8 +110,8 @@ contract DeployHelpers is DevConstants {
         token0: address(token0),
         token1: address(token1),
         fee: props.fee,
-        //        tickLower: MIN_TICK,
-        //        tickUpper: MAX_TICK,
+              //  tickLower: MIN_TICK,
+              //  tickUpper: MAX_TICK,
         tickLower: tickLower,
         tickUpper: tickUpper,
         amount0Desired: props.tokenA < props.tokenB ? a(amountA, token0.decimals()) : a(amountB, token1.decimals()),
@@ -147,9 +119,12 @@ contract DeployHelpers is DevConstants {
         amount0Min: 0,
         amount1Min: 0,
         recipient: msg.sender,
-        deadline: block.timestamp + 1000
+        deadline: block.timestamp
       })
     );
+
+     pool.increaseObservationCardinalityNext(2);
+
     return pool;
   }
 
@@ -159,14 +134,14 @@ contract DeployHelpers is DevConstants {
     uint256 priceTo
   ) public returns (RangePool) {
     RangePool rangePool = RangePool(
-      rpFactory.deployRangePool(props.tokenA, props.tokenB, props.fee, priceFrom, priceTo)
+      rangePoolFactory.deployRangePool(props.tokenA, props.tokenB, props.fee, ORACLE_SECONDS, priceFrom, priceTo)
     );
     Token(props.tokenA).approve(address(rangePool), maxAllowance);
     Token(props.tokenB).approve(address(rangePool), maxAllowance);
     return rangePool;
   }
 
-  function a(uint256 x, uint8 decimals) public pure returns (uint256) {
+  function a(uint256 x, uint8 decimals) private pure returns (uint256) {
     return x * 10**decimals;
   }
 }

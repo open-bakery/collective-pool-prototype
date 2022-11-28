@@ -25,6 +25,8 @@ contract DevConstants is Script {
   uint160 internal constant MIN_SQRT_RATIO = 4295128739;
   uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
 
+  uint32 internal constant ORACLE_SECONDS = 60;
+
   uint256 MAX_INT = 2**256 - 1;
   uint16 maxSlippage = 100_00;
   uint256 maxAllowance = MAX_INT;

@@ -30,6 +30,7 @@ contract RangePoolFactory {
     address tokenA,
     address tokenB,
     uint24 fee,
+    uint32 oracleSeconds,
     uint256 lowerLimitInTokenB,
     uint256 upperLimitInTokenB
   ) external returns (address) {
@@ -40,6 +41,7 @@ contract RangePoolFactory {
       tokenA: tokenA,
       tokenB: tokenB,
       fee: fee,
+      oracleSeconds: oracleSeconds,
       lowerLimitInTokenB: lowerLimitInTokenB,
       upperLimitInTokenB: upperLimitInTokenB
     });
