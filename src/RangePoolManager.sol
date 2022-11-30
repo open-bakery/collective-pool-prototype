@@ -135,8 +135,6 @@ contract RangePoolManager is Ownable {
     uint16 slippage
   ) external returns (uint256 amountRemoved0, uint256 amountRemoved1) {
     bool isPrivate = _checkIfPrivate(rangePool, msg.sender);
-    address token0 = RangePool(rangePool).pool().token0();
-    address token1 = RangePool(rangePool).pool().token1();
 
     (amountRemoved0, amountRemoved1) = RangePool(rangePool).removeLiquidity(liquidityAmount, slippage);
 
@@ -144,8 +142,13 @@ contract RangePoolManager is Ownable {
       // Code for collective pools
     }
 
-    ERC20(token0).safeTransfer(msg.sender, amountRemoved0); //_min(amountRemoved0, ERC20(token0).balanceOf(address(this))));
-    ERC20(token1).safeTransfer(msg.sender, amountRemoved1); //_min(amountRemoved1, ERC20(token1).balanceOf(address(this))));
+    _safeTransferTokens(
+      msg.sender,
+      RangePool(rangePool).pool().token0(),
+      RangePool(rangePool).pool().token1(),
+      amountRemoved0,
+      amountRemoved1
+    );
   }
 
   function claimNFT(address rangePool, address recipient) external {
@@ -164,9 +167,13 @@ contract RangePoolManager is Ownable {
   {
     bool isPrivate = _checkIfPrivate(rangePool, msg.sender);
 
+    (tokenCollected0, tokenCollected1, collectedFees0, collectedFees1) = RangePool(rangePool).collectFees();
+
     if (!isPrivate) {
       // Code for collective pools
     }
+
+    _safeTransferTokens(msg.sender, tokenCollected0, tokenCollected1, collectedFees0, collectedFees1);
   }
 
   function updateRange(
@@ -186,6 +193,17 @@ contract RangePoolManager is Ownable {
       uint256 amountRefunded1
     )
   {}
+
+  function _safeTransferTokens(
+    address _recipient,
+    address _token0,
+    address _token1,
+    uint256 _amount0,
+    uint256 _amount1
+  ) internal {
+    ERC20(_token0).safeTransfer(msg.sender, _min(_amount0, ERC20(_token0).balanceOf(address(this))));
+    ERC20(_token1).safeTransfer(msg.sender, _min(_amount1, ERC20(_token1).balanceOf(address(this))));
+  }
 
   function _min(uint256 a, uint256 b) internal pure returns (uint256) {
     return a < b ? a : b;

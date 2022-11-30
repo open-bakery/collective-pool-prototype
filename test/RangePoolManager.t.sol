@@ -164,6 +164,43 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     rangePoolManager.claimNFT(privateRangePool, prankster);
   }
 
+  function testPrivatePoolCollectFees() public {
+    address privateRangePool = _createRangePool();
+    _privatePoolAddLiquidity(privateRangePool);
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    (uint256 prevBalance0, uint256 prevBalance1) = _tokenBalances(
+      RangePool(privateRangePool).pool().token0(),
+      RangePool(privateRangePool).pool().token1()
+    );
+
+    (
+      address tokenCollected0,
+      address tokenCollected1,
+      uint256 collectedFees0,
+      uint256 collectedFees1
+    ) = rangePoolManager.collectFees(privateRangePool);
+
+    (uint256 currentBalance0, uint256 currentBalance1) = _tokenBalances(tokenCollected0, tokenCollected1);
+
+    assertTrue(collectedFees0 != 0);
+    assertTrue(collectedFees1 != 0);
+
+    assertTrue(currentBalance0 == prevBalance0 + collectedFees0);
+    assertTrue(currentBalance1 == prevBalance1 + collectedFees1);
+  }
+
+  function testPrivatePoolCollectFeesRevert() public {
+    address privateRangePool = _createRangePool();
+    _privatePoolAddLiquidity(privateRangePool);
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    address prankster = address(0xdad);
+    vm.prank(prankster);
+    vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
+    rangePoolManager.collectFees(privateRangePool);
+  }
+
   function onERC721Received(
     address operator,
     address from,
