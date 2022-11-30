@@ -6,7 +6,11 @@ deploy-testnet:; forge script script/DevDeploy.s.sol:Deploy --fork-url $(FORK_RP
 
 trace:; forge test -vv
 
+testHelpers:; forge test -vv --mc ^TestHelpersTest$
+
 testRangePool:; forge test -vvv --mc ^RangePoolTest$
+
+testRangePoolManager:; forge test -vv --mc ^RangePoolManagerTest$
 
 testLocal:; forge test -vvv --match-test testAnvil*
 

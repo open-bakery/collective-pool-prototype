@@ -70,13 +70,20 @@ contract RangePool is IRangePool, Ownable {
     returns (
       uint128 liquidityAdded,
       uint256 amountAdded0,
-      uint256 amountAdded1
+      uint256 amountAdded1,
+      uint256 amountRefunded0,
+      uint256 amountRefunded1
     )
   {
     ERC20(pool.token0()).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(pool.token1()).safeTransferFrom(msg.sender, address(this), amount1);
 
-    (liquidityAdded, amountAdded0, amountAdded1) = _addLiquidity(msg.sender, amount0, amount1, slippage);
+    (liquidityAdded, amountAdded0, amountAdded1, amountRefunded0, amountRefunded1) = _addLiquidity(
+      msg.sender,
+      amount0,
+      amount1,
+      slippage
+    );
   }
 
   function removeLiquidity(uint128 liquidityAmount, uint16 slippage)
@@ -121,9 +128,11 @@ contract RangePool is IRangePool, Ownable {
     external
     onlyOwner
     returns (
-      uint128 addedLiquidity,
-      uint256 addedAmount0,
-      uint256 addedAmount1
+      uint128 liquidityAdded,
+      uint256 amountAdded0,
+      uint256 amountAdded1,
+      uint256 amountRefunded0,
+      uint256 amountRefunded1
     )
   {
     (uint256 collected0, uint256 collected1) = _decreaseLiquidity(
@@ -136,7 +145,12 @@ contract RangePool is IRangePool, Ownable {
 
     (lowerTick, upperTick) = Helper.validateAndConvertLimits(pool, tokenA, lowerLimitA, upperLimitA);
 
-    (addedLiquidity, addedAmount0, addedAmount1) = _addLiquidity(msg.sender, collected0, collected1, slippage);
+    (liquidityAdded, amountAdded0, amountAdded1, amountRefunded0, amountRefunded1) = _addLiquidity(
+      msg.sender,
+      collected0,
+      collected1,
+      slippage
+    );
   }
 
   function _addLiquidity(
@@ -149,7 +163,9 @@ contract RangePool is IRangePool, Ownable {
     returns (
       uint128 _liquidityAdded,
       uint256 _amountAdded0,
-      uint256 _amountAdded1
+      uint256 _amountAdded1,
+      uint256 _amountRefunded0,
+      uint256 _amountRefunded1
     )
   {
     (uint256 amountRatioed0, uint256 amountRatioed1) = Helper.convertToRatio(
@@ -169,11 +185,6 @@ contract RangePool is IRangePool, Ownable {
         amountRatioed1,
         _slippage
       );
-
-      uint256 refund0 = amountRatioed0.sub(_amountAdded0);
-      uint256 refund1 = amountRatioed1.sub(_amountAdded1);
-      if (refund0 != 0) ERC20(pool.token0()).safeTransfer(_recipient, refund0);
-      if (refund1 != 0) ERC20(pool.token1()).safeTransfer(_recipient, refund1);
     } else {
       (_liquidityAdded, _amountAdded0, _amountAdded1) = _increaseLiquidity(
         _recipient,
@@ -182,6 +193,11 @@ contract RangePool is IRangePool, Ownable {
         _slippage
       );
     }
+
+    _amountRefunded0 = amountRatioed0.sub(_amountAdded0);
+    _amountRefunded1 = amountRatioed1.sub(_amountAdded1);
+    if (_amountRefunded0 != 0) ERC20(pool.token0()).safeTransfer(_recipient, _amountRefunded0);
+    if (_amountRefunded1 != 0) ERC20(pool.token1()).safeTransfer(_recipient, _amountRefunded1);
   }
 
   function _mint(

@@ -45,7 +45,8 @@ contract SimpleStrategies {
     _maxApprove(address(rangePool), token0, amountCollected0);
     _maxApprove(address(rangePool), token1, amountCollected1);
 
-    (addedLiquidity, amountCompounded0, amountCompounded1) = rangePool.addLiquidity(
+    // Implement refund amount
+    (addedLiquidity, amountCompounded0, amountCompounded1, , ) = rangePool.addLiquidity(
       amountCollected0,
       amountCollected1,
       slippage

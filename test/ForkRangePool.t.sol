@@ -112,7 +112,7 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
     deal(rangePool.pool().token0(), address(this), amount0);
     deal(rangePool.pool().token1(), address(this), amount1);
 
-    (uint128 liquidityAdded, uint256 amount0Added, uint256 amount1Added) = rangePool.addLiquidity(
+    (uint128 liquidityAdded, uint256 amount0Added, uint256 amount1Added, , ) = rangePool.addLiquidity(
       amount0,
       amount1,
       slippage
@@ -138,7 +138,7 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
 
     (uint256 iLiquidity, uint256 ibToken0, uint256 ibToken1) = _intialBalances();
 
-    (uint128 liquidityAdded, uint256 amount0Added, uint256 amount1Added) = rangePool.addLiquidity(
+    (uint128 liquidityAdded, uint256 amount0Added, uint256 amount1Added, , ) = rangePool.addLiquidity(
       amount0,
       amount1,
       slippage
@@ -195,7 +195,7 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
     uint256 upperLimit,
     uint16 slippage
   ) internal {
-    (uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1) = rangePool.updateRange(
+    (uint128 addedLiquidity, uint256 addedAmount0, uint256 addedAmount1, , ) = rangePool.updateRange(
       token,
       lowerLimit,
       upperLimit,

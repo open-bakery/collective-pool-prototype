@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import './DeployHelpers.sol';
 import '../logs/Logs.sol';
+import '../libraries/Helper.sol';
 
 abstract contract TestHelpers is DeployHelpers, Logs {
   function deployBase() public {
@@ -60,6 +61,16 @@ abstract contract TestHelpers is DeployHelpers, Logs {
       receivedA = swap(tokenB, tokenA, fee, receivedB);
       receivedB = swap(tokenA, tokenB, fee, receivedA);
     }
+  }
+
+  function isCloseTo(
+    uint256 value,
+    uint256 expected,
+    uint256 delta
+  ) internal pure returns (bool) {
+    uint256 upperLimit = value + delta;
+    uint256 lowerLimit = value - delta;
+    return (expected <= upperLimit && expected >= lowerLimit);
   }
 
   function predictAddress(
