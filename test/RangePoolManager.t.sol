@@ -286,6 +286,29 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     assertTrue(currentBalance1 == initalBalance1 + amountRefunded1, 'Test refund 1');
   }
 
+  function testPrivatePoolUpdateRangeRevert() public {
+    address privateRangePool = _createRangePool();
+    _privatePoolAddLiquidity(privateRangePool);
+
+    address token1 = RangePool(privateRangePool).pool().token1();
+
+    uint256 newLowerRange = Conversion.convertTickToPriceUint(
+      RangePool(privateRangePool).lowerTick(),
+      ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+    ) / 2;
+
+    uint256 newUpperRange = Conversion.convertTickToPriceUint(
+      RangePool(privateRangePool).upperTick(),
+      ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+    ) * 2;
+
+    address prankster = address(0xdad);
+    vm.prank(prankster);
+    vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
+
+    rangePoolManager.updateRange(privateRangePool, token1, newLowerRange, newUpperRange, 1_00);
+  }
+
   function onERC721Received(
     address operator,
     address from,
