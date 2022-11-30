@@ -26,7 +26,7 @@ contract RangePoolManager is Ownable {
   mapping(address => mapping(address => PositionData)) public position; // position[rangePool][user] = PositionData;
 
   modifier onlyAllowed() {
-    require(msg.sender == owner() || isRegistered[msg.sender] == true, 'RangePool: Caller not allowed');
+    require(msg.sender == owner() || isRegistered[msg.sender] == true, 'RangePoolManager: Caller not allowed');
     _;
   }
 
@@ -77,7 +77,6 @@ contract RangePoolManager is Ownable {
     //     lowerLimitInTokenB,
     //     upperLimitInTokenB
     //   );
-    //   poolController[rangePool] = msg.sender;
     //   emit PrivateRangePoolCreated(rangePool);
   }
 
@@ -119,15 +118,77 @@ contract RangePoolManager is Ownable {
       _refundTokens(msg.sender, token0, token1, amountRefunded0, amountRefunded1);
     }
 
-    // PositionData memory cachePosition;
-
     if (!isPrivate) {
+      // Code for collective pools
+      // PositionData memory cachePosition;
       if (liquitityToken[rangePool] == address(0))
         liquitityToken[rangePool] = address(new LiquidityProviderToken(RangePool(rangePool).tokenId()));
 
       address lp = liquitityToken[rangePool];
       _mint(address(lp), msg.sender, liquidityAdded);
     }
+  }
+
+  function removeLiquidity(
+    address rangePool,
+    uint128 liquidityAmount,
+    uint16 slippage
+  ) external returns (uint256 amountRemoved0, uint256 amountRemoved1) {
+    bool isPrivate = _checkIfPrivate(rangePool, msg.sender);
+    address token0 = RangePool(rangePool).pool().token0();
+    address token1 = RangePool(rangePool).pool().token1();
+
+    (amountRemoved0, amountRemoved1) = RangePool(rangePool).removeLiquidity(liquidityAmount, slippage);
+
+    if (!isPrivate) {
+      // Code for collective pools
+    }
+
+    ERC20(token0).safeTransfer(msg.sender, amountRemoved0); //_min(amountRemoved0, ERC20(token0).balanceOf(address(this))));
+    ERC20(token1).safeTransfer(msg.sender, amountRemoved1); //_min(amountRemoved1, ERC20(token1).balanceOf(address(this))));
+  }
+
+  function claimNFT(address rangePool, address recipient) external {
+    require(poolController[rangePool] == msg.sender, 'RangePoolManager: Only private pool owners can claim NFTs');
+    RangePool(rangePool).claimNFT(recipient);
+  }
+
+  function collectFees(address rangePool)
+    external
+    returns (
+      address tokenCollected0,
+      address tokenCollected1,
+      uint256 collectedFees0,
+      uint256 collectedFees1
+    )
+  {
+    bool isPrivate = _checkIfPrivate(rangePool, msg.sender);
+
+    if (!isPrivate) {
+      // Code for collective pools
+    }
+  }
+
+  function updateRange(
+    address rangePool,
+    address tokenA,
+    uint256 lowerLimitA,
+    uint256 upperLimitA,
+    uint16 slippage
+  )
+    external
+    onlyOwner
+    returns (
+      uint128 liquidityAdded,
+      uint256 amountAdded0,
+      uint256 amountAdded1,
+      uint256 amountRefunded0,
+      uint256 amountRefunded1
+    )
+  {}
+
+  function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+    return a < b ? a : b;
   }
 
   function _refundTokens(
@@ -143,7 +204,7 @@ contract RangePoolManager is Ownable {
 
   function _checkIfPrivate(address rangePool, address caller) private view returns (bool isPrivate) {
     if (poolController[rangePool] != address(0)) {
-      require(poolController[rangePool] == caller, 'RangePoolPositionManager: Range Pool is private');
+      require(poolController[rangePool] == caller, 'RangePoolManager: Range Pool is private');
       isPrivate = true;
     }
   }

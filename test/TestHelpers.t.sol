@@ -13,4 +13,8 @@ contract TestHelpersTest is TestHelpers {
     assertTrue(!isCloseTo(10, 7, 2));
     assertTrue(!isCloseTo(10, 13, 2));
   }
+
+  function testSol() public view {
+    console.log(address(0xfade));
+  }
 }

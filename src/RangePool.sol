@@ -94,8 +94,8 @@ contract RangePool is IRangePool, Ownable {
     (amountRemoved0, amountRemoved1) = _decreaseLiquidity(msg.sender, liquidityAmount, slippage);
   }
 
-  function claimNFT() external onlyOwner {
-    positionManager.safeTransferFrom(address(this), msg.sender, tokenId);
+  function claimNFT(address recipient) external onlyOwner {
+    positionManager.safeTransferFrom(address(this), recipient, tokenId);
   }
 
   function collectFees()
