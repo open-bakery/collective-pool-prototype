@@ -20,13 +20,14 @@ contract RangePoolManager is Ownable {
 
   address weth;
 
-  mapping(address => bool) public isRegistered; // isRegistered[rangePool][strategy] = bool;
-  mapping(address => address) public poolController;
+  mapping(address => mapping(address => bool)) public isRegistered; // isRegistered[rangePool][strategy] = bool;
+  mapping(address => mapping(address => bool)) public isRangePoolAdmin; // Is allowed to attach strategies to pools.
+  mapping(address => address) public rangePoolOwner; // Owners of private pools
   mapping(address => address) public liquitityToken; // liquidityToken[rangePool] = address;
   mapping(address => mapping(address => PositionData)) public position; // position[rangePool][user] = PositionData;
 
-  modifier onlyAllowed() {
-    require(msg.sender == owner() || isRegistered[msg.sender] == true, 'RangePoolManager: Caller not allowed');
+  modifier onlyAdmin(address rangePool) {
+    require(isRangePoolAdmin[rangePool][msg.sender], 'RangePoolManager: Caller not range pool admin');
     _;
   }
 
@@ -57,7 +58,8 @@ contract RangePoolManager is Ownable {
       lowerLimitInTokenB,
       upperLimitInTokenB
     );
-    poolController[rangePool] = msg.sender;
+    rangePoolOwner[rangePool] = msg.sender;
+    isRangePoolAdmin[rangePool][msg.sender] = true;
     emit PrivateRangePoolCreated(rangePool);
   }
 
@@ -152,7 +154,7 @@ contract RangePoolManager is Ownable {
   }
 
   function claimNFT(address rangePool, address recipient) external {
-    require(poolController[rangePool] == msg.sender, 'RangePoolManager: Only private pool owners can claim NFTs');
+    require(rangePoolOwner[rangePool] == msg.sender, 'RangePoolManager: Only private pool owners can claim NFTs');
     RangePool(rangePool).claimNFT(recipient);
   }
 
@@ -205,13 +207,19 @@ contract RangePoolManager is Ownable {
       // Code for collective pools
     }
 
-    _safeTransferTokens(
-      msg.sender,
-      RangePool(rangePool).pool().token0(),
-      RangePool(rangePool).pool().token1(),
-      amountRefunded0,
-      amountRefunded1
-    );
+    if (amountRefunded0 + amountRefunded1 != 0) {
+      _safeTransferTokens(
+        msg.sender,
+        RangePool(rangePool).pool().token0(),
+        RangePool(rangePool).pool().token1(),
+        amountRefunded0,
+        amountRefunded1
+      );
+    }
+  }
+
+  function attach(address rangePool, address strategy) external onlyAdmin(rangePool) {
+    isRegistered[rangePool][strategy] = true;
   }
 
   function _safeTransferTokens(
@@ -241,8 +249,8 @@ contract RangePoolManager is Ownable {
   }
 
   function _checkIfPrivate(address rangePool, address caller) private view returns (bool isPrivate) {
-    if (poolController[rangePool] != address(0)) {
-      require(poolController[rangePool] == caller, 'RangePoolManager: Range Pool is private');
+    if (rangePoolOwner[rangePool] != address(0)) {
+      require(rangePoolOwner[rangePool] == caller, 'RangePoolManager: Range Pool is private');
       isPrivate = true;
     }
   }

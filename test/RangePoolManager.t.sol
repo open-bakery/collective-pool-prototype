@@ -52,7 +52,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     );
 
     assertTrue(RangePool(privateRangePool).owner() == address(rangePoolManager));
-    assertTrue(rangePoolManager.poolController(privateRangePool) == address(this));
+    assertTrue(rangePoolManager.rangePoolOwner(privateRangePool) == address(this));
   }
 
   function testPrivatePoolAddLiquidity() public {
@@ -307,6 +307,29 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
 
     rangePoolManager.updateRange(privateRangePool, token1, newLowerRange, newUpperRange, 1_00);
+  }
+
+  function testPoolManagerAdmin() public {
+    address privateRangePool = _createRangePool();
+
+    assertTrue(rangePoolManager.isRangePoolAdmin(privateRangePool, address(this)), 'Admin registration');
+  }
+
+  function testAttachStrategy() public {
+    address privateRangePool = _createRangePool();
+    address strategy = address(0x111);
+    rangePoolManager.attach(privateRangePool, strategy);
+
+    assertTrue(rangePoolManager.isRegistered(privateRangePool, strategy), 'Strategy registration');
+  }
+
+  function testAttachStrategyRevert() public {
+    address privateRangePool = _createRangePool();
+    address strategy = address(0x111);
+    address prankster = address(0xdad);
+    vm.prank(prankster);
+    vm.expectRevert(bytes('RangePoolManager: Caller not range pool admin'));
+    rangePoolManager.attach(privateRangePool, strategy);
   }
 
   function onERC721Received(

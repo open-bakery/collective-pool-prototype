@@ -11,6 +11,7 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import './libraries/Swapper.sol';
 import './libraries/Helper.sol';
 import './RangePool.sol';
+import './RangePoolManager.sol';
 
 contract SimpleStrategies {
   using SafeERC20 for ERC20;
@@ -26,14 +27,27 @@ contract SimpleStrategies {
   );
   event Stacked(address indexed receiver, uint256 amountStacked);
 
-  modifier onlyOwner(RangePool rangePool) {
-    require(msg.sender == rangePool.owner(), 'SimpleStrategies:OW'); //Only Owner of range pool can call this function
+  modifier onlyAllowed(RangePool rangePool) {
+    address rangePoolOwner = RangePoolManager(rangePool.owner()).rangePoolOwner(address(rangePool));
+
+    if (rangePoolOwner != address(0)) {
+      require(rangePoolOwner == msg.sender, 'SimpleStrategies: Range Pool is private');
+    }
+    _;
+  }
+
+  modifier onlyResgitered(RangePool rangePool) {
+    RangePoolManager rangePoolManager = RangePoolManager(rangePool.owner());
+    require(
+      rangePoolManager.isRegistered(address(rangePool), address(this)),
+      'SimpleStrategies: Strategy not attached to range pool'
+    );
     _;
   }
 
   function compound(RangePool rangePool, uint16 slippage)
     external
-    onlyOwner(rangePool)
+    onlyAllowed(rangePool)
     returns (
       uint128 addedLiquidity,
       uint256 amountCompounded0,
@@ -61,7 +75,7 @@ contract SimpleStrategies {
     RangePool rangePool,
     address tokenToStack,
     uint16 slippage
-  ) external onlyOwner(rangePool) returns (uint256 amountStacked) {
+  ) external onlyAllowed(rangePool) returns (uint256 amountStacked) {
     require(
       tokenToStack == rangePool.pool().token0() || tokenToStack == rangePool.pool().token1(),
       'SimpleStrategies:NA' //  Can only stack tokens belonging to the pool
