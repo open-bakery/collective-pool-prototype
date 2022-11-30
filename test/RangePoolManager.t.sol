@@ -201,6 +201,91 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     rangePoolManager.collectFees(privateRangePool);
   }
 
+  function testPrivatePoolUpdateRange() public {
+    address privateRangePool = _createRangePool();
+    _privatePoolAddLiquidity(privateRangePool);
+    uint256 tokenId = RangePool(privateRangePool).tokenId();
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    uint256 newLowerRange = Conversion.convertTickToPriceUint(
+      RangePool(privateRangePool).lowerTick(),
+      ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+    ) / 2;
+
+    uint256 newUpperRange = Conversion.convertTickToPriceUint(
+      RangePool(privateRangePool).upperTick(),
+      ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+    ) * 2;
+
+    (
+      uint128 liquidityAdded,
+      uint256 amountAdded0,
+      uint256 amountAdded1,
+      uint256 amountRefunded0,
+      uint256 amountRefunded1
+    ) = rangePoolManager.updateRange(
+        privateRangePool,
+        RangePool(privateRangePool).pool().token1(),
+        newLowerRange,
+        newUpperRange,
+        1_00
+      );
+
+    assertTrue(liquidityAdded != 0, 'Liquidity added != 0');
+    assertTrue(RangePool(privateRangePool).tokenId() == tokenId + 1, 'New position created');
+    assertTrue(
+      Helper.positionLiquidity(
+        INonfungiblePositionManager(RangePoolFactory(rangePoolFactory).positionManager()),
+        tokenId + 1
+      ) == liquidityAdded,
+      'Liquidity has been added to position'
+    );
+
+    (int24 newLowerTick, int24 newUpperTick) = Conversion.convertLimitsToTicks(
+      newLowerRange,
+      newUpperRange,
+      TICK_SPACING[fee],
+      ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+    );
+
+    assertTrue(newLowerTick == RangePool(privateRangePool).lowerTick(), 'LowerTick has been updated');
+    assertTrue(newUpperTick == RangePool(privateRangePool).upperTick(), 'UpperTick has been updated');
+  }
+
+  function testRefundPrivatePoolUpdateRange() public {
+    address privateRangePool = _createRangePool();
+    _privatePoolAddLiquidity(privateRangePool);
+    uint256 tokenId = RangePool(privateRangePool).tokenId();
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    (uint256 initalBalance0, uint256 initalBalance1) = _tokenBalances(
+      RangePool(privateRangePool).pool().token0(),
+      RangePool(privateRangePool).pool().token1()
+    );
+
+    (, , , uint256 amountRefunded0, uint256 amountRefunded1) = rangePoolManager.updateRange(
+      privateRangePool,
+      RangePool(privateRangePool).pool().token1(),
+      Conversion.convertTickToPriceUint(
+        RangePool(privateRangePool).lowerTick(),
+        ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+      ) / 2,
+      Conversion.convertTickToPriceUint(
+        RangePool(privateRangePool).upperTick(),
+        ERC20(RangePool(privateRangePool).pool().token0()).decimals()
+      ) * 2,
+      1_00
+    );
+
+    (uint256 currentBalance0, uint256 currentBalance1) = _tokenBalances(
+      RangePool(privateRangePool).pool().token0(),
+      RangePool(privateRangePool).pool().token1()
+    );
+
+    assertTrue(currentBalance0 == initalBalance0 + amountRefunded0, 'Test refund 0');
+    assertTrue(currentBalance1 == initalBalance1 + amountRefunded1, 'Test refund 1');
+  }
+
   function onERC721Received(
     address operator,
     address from,

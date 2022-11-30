@@ -184,7 +184,6 @@ contract RangePoolManager is Ownable {
     uint16 slippage
   )
     external
-    onlyOwner
     returns (
       uint128 liquidityAdded,
       uint256 amountAdded0,
@@ -192,7 +191,28 @@ contract RangePoolManager is Ownable {
       uint256 amountRefunded0,
       uint256 amountRefunded1
     )
-  {}
+  {
+    bool isPrivate = _checkIfPrivate(rangePool, msg.sender);
+
+    (liquidityAdded, amountAdded0, amountAdded1, amountRefunded0, amountRefunded1) = RangePool(rangePool).updateRange(
+      tokenA,
+      lowerLimitA,
+      upperLimitA,
+      slippage
+    );
+
+    if (!isPrivate) {
+      // Code for collective pools
+    }
+
+    _safeTransferTokens(
+      msg.sender,
+      RangePool(rangePool).pool().token0(),
+      RangePool(rangePool).pool().token1(),
+      amountRefunded0,
+      amountRefunded1
+    );
+  }
 
   function _safeTransferTokens(
     address _recipient,
