@@ -21,7 +21,6 @@ contract RangePoolManagerBase is Ownable {
   }
 
   RangePoolFactory rangePoolFactory;
-
   address weth;
 
   mapping(address => mapping(address => bool)) public isRegistered; // isRegistered[rangePool][strategy] = bool;
@@ -32,14 +31,14 @@ contract RangePoolManagerBase is Ownable {
   mapping(address => mapping(address => PositionData)) public position; // position[rangePool][user] = PositionData;
 
   modifier onlyAdmin(address rangePool) {
-    require(isRangePoolAdmin[rangePool][msg.sender], 'RangePoolManager: Caller not range pool admin');
+    require(isRangePoolAdmin[rangePool][msg.sender], 'RangePoolManagerBase: Caller not range pool admin');
     _;
   }
 
   event PrivateRangePoolCreated(address indexed rangePool);
 
   function setWeth(address _weth) external onlyOwner {
-    require(_weth == address(0), 'RangePoolManager: Weth already set');
+    require(_weth == address(0), 'RangePoolManagerBase: Weth already set');
     weth = _weth;
   }
 
@@ -96,6 +95,8 @@ contract RangePoolManagerBase is Ownable {
 
     address token0 = rangePool.pool().token0();
     address token1 = rangePool.pool().token1();
+
+    (amount0, amount1) = _checkEthDeposit(token0, token1, amount0, amount1);
 
     ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
@@ -211,7 +212,7 @@ contract RangePoolManagerBase is Ownable {
   function claimNFT(RangePool rangePool, address recipient) external {
     require(
       rangePoolOwner[address(rangePool)] == msg.sender,
-      'RangePoolManager: Only private pool owners can claim NFTs'
+      'RangePoolManagerBase: Only private pool owners can claim NFTs'
     );
     rangePool.claimNFT(recipient);
   }
@@ -228,7 +229,7 @@ contract RangePoolManagerBase is Ownable {
     address caller = (isRegistered[address(rangePool)][sender]) ? delegate : sender;
 
     if (rangePoolOwner[rangePool] != address(0)) {
-      require(rangePoolOwner[rangePool] == caller, 'RangePoolManager: Range Pool is private');
+      require(rangePoolOwner[rangePool] == caller, 'RangePoolManagerBase: Range Pool is private');
       isPrivate = true;
     }
   }
@@ -264,27 +265,32 @@ contract RangePoolManagerBase is Ownable {
     LiquidityProviderToken(_lpToken).mint(_recipient, _amount);
   }
 
-  // function _useWeth(uint256 token0Amount, uint256 token1Amount)
-  //   internal
-  //   returns (
-  //     uint256,
-  //     uint256,
-  //     bool
-  //   )
-  // {
-  //   bool _ethUsed = false;
-  //   uint256 _eth = msg.value;
-  //   if (_eth > 0) {
-  //     IWETH9(weth).deposit{ value: _eth }();
-  //
-  //     if (pool.token0() == weth) {
-  //       token0Amount = _eth;
-  //       _ethUsed = true;
-  //     } else if (pool.token1() == weth) {
-  //       token1Amount = _eth;
-  //       _ethUsed = true;
-  //     }
-  //   }
-  //   return (token0Amount, token1Amount, _ethUsed);
-  // }
+  function _checkEthDeposit(
+    address _token0,
+    address _token1,
+    uint256 _amount0,
+    uint256 _amount1
+  ) internal returns (uint256, uint256) {
+    uint256 _ethAmount = msg.value;
+
+    if (_ethAmount != 0) {
+      bool _ethUsed;
+
+      if (_token0 == weth) {
+        _amount0 += _ethAmount;
+        _ethUsed = true;
+      } else if (_token1 == weth) {
+        _amount1 += _ethAmount;
+        _ethUsed = true;
+      }
+
+      if (_ethUsed) {
+        IWETH9(weth).deposit{ value: _ethAmount }();
+      } else {
+        revert('RangePoolManagerBase: Eth not supported for this pool.');
+      }
+    }
+
+    return (_amount0, _amount1);
+  }
 }

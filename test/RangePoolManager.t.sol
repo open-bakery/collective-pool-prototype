@@ -82,7 +82,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     address prankster = address(0xdad);
     _approveAndDeal(tokenB, tokenA, amount0, amount1, address(rangePoolManager), prankster);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
     rangePoolManager.addLiquidity(privateRangePool, amount0, amount1, slippage);
   }
 
@@ -122,7 +122,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     (uint128 liquidityAdded, , , , ) = _privatePoolAddLiquidity(privateRangePool);
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
     rangePoolManager.removeLiquidity(privateRangePool, liquidityAdded, 1_00);
   }
 
@@ -145,7 +145,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManager: Only private pool owners can claim NFTs'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Only private pool owners can claim NFTs'));
     rangePoolManager.claimNFT(privateRangePool, prankster);
   }
 
@@ -182,7 +182,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
     rangePoolManager.collectFees(privateRangePool);
   }
 
@@ -282,7 +282,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManager: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
 
     rangePoolManager.updateRange(privateRangePool, token1, newLowerRange, newUpperRange, 1_00);
   }
@@ -306,7 +306,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     address strategy = address(0x111);
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManager: Caller not range pool admin'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not range pool admin'));
     rangePoolManager.attach(address(privateRangePool), strategy);
   }
 
