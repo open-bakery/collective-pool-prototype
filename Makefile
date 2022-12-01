@@ -10,13 +10,13 @@ testHelpers:; forge test -vv --mc ^TestHelpersTest$
 
 testRangePool:; forge test -vvv --mc ^RangePoolTest$
 
-testRangePoolManager:; forge test -vv --mc ^RangePoolManagerTest$
+testRangePoolManager:; forge test -vv --gas-report --mc ^RangePoolManagerTest$
+
+testSimpleStrategy:; forge test -vv --mc ^SimpleStrategiesTest$
 
 testLocal:; forge test -vvv --match-test testAnvil*
 
 testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(FORK_RPC_URL)
-
-testPositionManager:; forge test -vvv --mc RangePoolPositionManager* --fork-url $(FORK_RPC_URL)
 
 # testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
 testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL) --gas-report

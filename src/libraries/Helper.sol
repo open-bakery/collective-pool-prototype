@@ -100,17 +100,6 @@ library Helper {
     (, , , , , , , liquidity, , , , ) = positionManager.positions(tokenId);
   }
 
-  function safeBalanceTransfer(
-    address token,
-    address sender,
-    address recipient,
-    uint256 amount
-  ) external returns (uint256 amountSend) {
-    uint256 balance = ERC20(token).balanceOf(sender);
-    amountSend = (amount > balance) ? balance : amount;
-    ERC20(token).safeTransfer(recipient, amountSend);
-  }
-
   function fees(INonfungiblePositionManager positionManager, uint256 tokenId)
     external
     view
