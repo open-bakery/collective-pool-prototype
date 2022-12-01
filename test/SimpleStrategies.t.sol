@@ -35,10 +35,6 @@ contract SimpleStrategiesTest is TestHelpers {
     simpleStrategies = new SimpleStrategies();
   }
 
-  function testExample() public {
-    assertTrue(true);
-  }
-
   function testAttachStrategy() public {
     RangePool privateRangePool = _createRangePoolAndAttachStrategy();
 
@@ -87,17 +83,47 @@ contract SimpleStrategiesTest is TestHelpers {
     assertTrue(ERC20(privateRangePool.pool().token1()).balanceOf(address(simpleStrategies)) == 0);
   }
 
-  //
-  // function stack(address token, uint16 slippage) internal {
-  //   (, uint256 ibToken0, uint256 ibToken1) = _intialBalances();
-  //   uint256 initialBalance = (token == rangePool.pool().token0()) ? ibToken0 : ibToken1;
-  //   uint256 amount = simpleStrategies.stack(rangePool, token, slippage);
-  //
-  //   logr('stack()', ['amount', '0', '0', '0', '0', '0'], [uint256(amount), 0, 0, 0, 0, 0]);
-  //
-  //   assertTrue(amount > 0);
-  //   assertTrue(ERC20(token).balanceOf(address(this)) == initialBalance.add(amount));
-  // }
+  function testCompoundRevert() public {
+    RangePool privateRangePool = _createRangePoolAndAttachStrategy();
+    _privatePoolAddLiquidity(privateRangePool);
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    address prankster = address(0xdad);
+    vm.prank(prankster);
+    vm.expectRevert(bytes('SimpleStrategies: Range Pool is private'));
+    simpleStrategies.compound(privateRangePool, 1_00);
+  }
+
+  function testStack() public {
+    RangePool privateRangePool = _createRangePoolAndAttachStrategy();
+    _privatePoolAddLiquidity(privateRangePool);
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    address token0 = privateRangePool.pool().token0();
+    address token1 = privateRangePool.pool().token1();
+
+    (uint256 initialBalance0, ) = _tokenBalances(token0, token1);
+
+    uint256 amountStacked = simpleStrategies.stack(privateRangePool, token0, 1_00);
+
+    (uint256 currentBalance0, ) = _tokenBalances(token0, token1);
+
+    assertTrue(amountStacked != 0);
+    assertTrue(currentBalance0 == amountStacked + initialBalance0);
+    assertTrue(ERC20(privateRangePool.pool().token0()).balanceOf(address(simpleStrategies)) == 0);
+    assertTrue(ERC20(privateRangePool.pool().token1()).balanceOf(address(simpleStrategies)) == 0);
+  }
+
+  function testStackRevert() public {
+    RangePool privateRangePool = _createRangePoolAndAttachStrategy();
+    _privatePoolAddLiquidity(privateRangePool);
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+
+    address prankster = address(0xdad);
+    vm.prank(prankster);
+    vm.expectRevert(bytes('SimpleStrategies: Range Pool is private'));
+    simpleStrategies.stack(privateRangePool, tokenA, 1_00);
+  }
 
   function _privatePoolAddLiquidity(RangePool _rangePool)
     private

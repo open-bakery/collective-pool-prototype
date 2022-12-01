@@ -4,5 +4,5 @@ out = 'out'
 libs = ['lib']
 auto_detect_solc = true
 fs_permissions = [{ access = "read-write", path = "./dist" }]
-gas_reports = ["RangePool", "RangePoolFactory", "RangePoolManager"]
+gas_reports = ["RangePool", "RangePoolFactory", "RangePoolManager", "SimpleStrategies"]
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

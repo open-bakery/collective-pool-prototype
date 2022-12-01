@@ -240,8 +240,16 @@ contract RangePoolManagerBase is Ownable {
     uint256 _amount0,
     uint256 _amount1
   ) internal {
-    if (_amount0 != 0) ERC20(_token0).safeTransfer(_recipient, _min(_amount0, ERC20(_token0).balanceOf(address(this))));
-    if (_amount1 != 0) ERC20(_token1).safeTransfer(_recipient, _min(_amount1, ERC20(_token1).balanceOf(address(this))));
+    _safeTransferToken(_recipient, _token0, _amount0);
+    _safeTransferToken(_recipient, _token1, _amount1);
+  }
+
+  function _safeTransferToken(
+    address _recipient,
+    address _token,
+    uint256 _amount
+  ) internal {
+    if (_amount != 0) ERC20(_token).safeTransfer(_recipient, _min(_amount, ERC20(_token).balanceOf(address(this))));
   }
 
   function _min(uint256 a, uint256 b) internal pure returns (uint256) {
