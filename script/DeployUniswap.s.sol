@@ -50,11 +50,10 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
     outputProp('weth', vm.toString(tokens.weth));
     outputProp('dai', vm.toString(tokens.dai));
     outputProp('usdc', vm.toString(tokens.usdc));
-    //    outputProp('gmx', vm.toString(tokens.gmx));
 
     writeAddress('weth', tokens.weth);
     writeAddress('dai', tokens.dai);
-    //    writeAddress('usdc', tokens.usdc);
+    writeAddress('usdc', tokens.usdc);
 
     writeAddress('uniswapFactory', address(uniswapFactory));
     writeAddress('router', address(uniswapRouter));

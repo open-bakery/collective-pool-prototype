@@ -68,7 +68,10 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
   function deployOurBase() public {
     lens = new Lens();
     rangePoolFactory = new RangePoolFactory(address(uniswapFactory), address(uniswapRouter), address(positionManager));
-    //    RangePoolManager = new RangePoolManager(address(rangePoolFactory), tokens.weth);
+    rangePoolManager = new RangePoolManager(address(rangePoolFactory), tokens.weth);
+    Token(tokens.weth).approve(address(rangePoolManager), maxAllowance);
+    Token(tokens.dai).approve(address(rangePoolManager), maxAllowance);
+    Token(tokens.usdc).approve(address(rangePoolManager), maxAllowance);
   }
 
   function createUniswapPool(
@@ -129,16 +132,16 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
     return pool;
   }
 
-  function createRangePool(
+  function createPrivateRangePool(
     PoolProps memory props,
     uint256 priceFrom,
     uint256 priceTo
   ) public returns (RangePool) {
     RangePool rangePool = RangePool(
-      rangePoolFactory.deployRangePool(props.tokenA, props.tokenB, props.fee, ORACLE_SECONDS, priceFrom, priceTo)
+      rangePoolManager.createPrivateRangePool(props.tokenA, props.tokenB, props.fee, ORACLE_SECONDS, priceFrom, priceTo)
     );
-    Token(props.tokenA).approve(address(rangePool), maxAllowance);
-    Token(props.tokenB).approve(address(rangePool), maxAllowance);
+    Token(props.tokenA).approve(address(rangePoolManager), maxAllowance);
+    Token(props.tokenB).approve(address(rangePoolManager), maxAllowance);
     return rangePool;
   }
 

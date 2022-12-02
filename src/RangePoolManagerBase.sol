@@ -36,7 +36,7 @@ contract RangePoolManagerBase is Ownable {
     _;
   }
 
-  event PrivateRangePoolCreated(address indexed rangePool);
+  event PrivateRangePoolCreated(address indexed rangePool, address indexed createdBy);
 
   function createPrivateRangePool(
     address tokenA,
@@ -56,7 +56,7 @@ contract RangePoolManagerBase is Ownable {
     );
     rangePoolOwner[rangePool] = msg.sender;
     isRangePoolAdmin[rangePool][msg.sender] = true;
-    emit PrivateRangePoolCreated(rangePool);
+    emit PrivateRangePoolCreated(rangePool, msg.sender);
   }
 
   function createCollectiveRangePool(

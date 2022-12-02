@@ -19,6 +19,7 @@ mkdir -p $ABIS_DIR
 
 declare -A contracts
 contracts[rangePoolFactory]=RangePoolFactory
+contracts[rangePoolManager]=RangePoolManager
 contracts[lens]=Lens
 contracts[rangePool]=RangePool
 contracts[erc20]=ERC20
