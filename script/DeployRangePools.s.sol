@@ -45,7 +45,14 @@ contract DeployRangePools is DeployHelpers, ScriptHelpers {
 */
     vm.stopBroadcast();
 
+    vm.startBroadcast(ALICE_KEY);
+    Token(tokens.weth).approve(address(uniswapRouter), maxAllowance);
+    Token(tokens.dai).approve(address(uniswapRouter), maxAllowance);
+    swap(tokens.weth, tokens.dai, poolProps[1].fee, a(1, 18));
+    vm.stopBroadcast();
+
     outputProp('lens', vm.toString(address(lens)));
     outputProp('rangePoolFactory', vm.toString(address(rangePoolFactory)));
+    writeAddress('rangePoolFactory', address(rangePoolFactory));
   }
 }

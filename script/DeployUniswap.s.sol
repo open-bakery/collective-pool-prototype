@@ -15,52 +15,36 @@ import '../src/utility/DeployHelpers.sol';
 import '../src/utility/ScriptHelpers.sol';
 
 contract DeployUniswap is DeployHelpers, ScriptHelpers {
-  function swap(
-    address tokenIn,
-    address tokenOut,
-    uint24 _fee,
-    uint256 amountIn
-  ) internal returns (uint256 amountOut) {
-    IUniswapV3Pool pool = IUniswapV3Pool(IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(tokenIn, tokenOut, _fee));
-
-    uint160 limit = pool.token0() == tokenIn ? MIN_SQRT_RATIO : MAX_SQRT_RATIO;
-
-    amountOut = uniswapRouter.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: tokenIn,
-        tokenOut: tokenOut,
-        fee: _fee,
-        recipient: address(this),
-        deadline: block.timestamp,
-        amountIn: amountIn,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: limit
-      })
-    );
-  }
-
   function run() external {
     vm.startBroadcast();
 
     deployAndDistributeTokens();
     initPoolProps();
     deployUniswapBase(tokens.weth);
-
     // let's deploy a few pools here. we'll need them later
     IUniswapV3Pool pool1 = createUniswapPool(poolProps[1], 100, 150000, 1500);
     pool1; // clear warning
     //    IUniswapV3Pool pool2 = createUniswapPool(poolProps[1], 100, 150000, 1500);
 
     // !!! just a dummy transaction to make sure blocks are written properly...
-    // seems to be a forge issue. The transactions before only get writtern onchain in the second script???
+    // seems to be a forge issue. The transactions before only get written onchain in the second script???
     ERC20(tokens.dai).transfer(BOB, amount(1));
-
     vm.stopBroadcast();
+
+    //     need a swap to have fees
+    //    vm.startBroadcast(ALICE_KEY);
+    //    swap(tokens.weth, tokens.dai, poolProps[1].fee, a(1, 18));
+    //    vm.stopBroadcast();
+
+    //    vm.startBroadcast(CHARLIE_KEY);
+    //    swap(tokens.dai, tokens.weth, poolProps[1].fee, a(500, 18));
+    //    vm.stopBroadcast();
 
     outputProp('startBlock', vm.toString(block.number));
     outputProp('network', NETWORK);
 
     outputProp('uniFactory', vm.toString(address(uniswapFactory)));
+    outputProp('router', vm.toString(address(uniswapRouter)));
     outputProp('positionManager', vm.toString(address(positionManager)));
 
     outputProp('weth', vm.toString(tokens.weth));
@@ -73,7 +57,7 @@ contract DeployUniswap is DeployHelpers, ScriptHelpers {
     //    writeAddress('usdc', tokens.usdc);
 
     writeAddress('uniswapFactory', address(uniswapFactory));
-    writeAddress('uniswapRouter', address(uniswapRouter));
+    writeAddress('router', address(uniswapRouter));
     writeAddress('positionManager', address(positionManager));
   }
 }

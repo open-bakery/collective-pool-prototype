@@ -50,7 +50,7 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
 
   function deployUniswapBase(address weth) public {
     initDeployHelpers();
-    
+
     require(weth != address(0), 'WETH needs to be deployed');
     console.log('deployUniswapBase msg.sender', msg.sender);
 
@@ -68,6 +68,7 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
   function deployOurBase() public {
     lens = new Lens();
     rangePoolFactory = new RangePoolFactory(address(uniswapFactory), address(uniswapRouter), address(positionManager));
+    //    RangePoolManager = new RangePoolManager(address(rangePoolFactory), tokens.weth);
   }
 
   function createUniswapPool(
@@ -110,8 +111,8 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
         token0: address(token0),
         token1: address(token1),
         fee: props.fee,
-              //  tickLower: MIN_TICK,
-              //  tickUpper: MAX_TICK,
+        //  tickLower: MIN_TICK,
+        //  tickUpper: MAX_TICK,
         tickLower: tickLower,
         tickUpper: tickUpper,
         amount0Desired: props.tokenA < props.tokenB ? a(amountA, token0.decimals()) : a(amountB, token1.decimals()),
@@ -119,11 +120,11 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
         amount0Min: 0,
         amount1Min: 0,
         recipient: msg.sender,
-        deadline: block.timestamp
+        deadline: block.timestamp + 1000
       })
     );
 
-     pool.increaseObservationCardinalityNext(2);
+    pool.increaseObservationCardinalityNext(2);
 
     return pool;
   }
@@ -141,7 +142,32 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
     return rangePool;
   }
 
-  function a(uint256 x, uint8 decimals) private pure returns (uint256) {
+  function swap(
+    address tokenIn,
+    address tokenOut,
+    uint24 fee,
+    uint256 amountIn
+  ) internal returns (uint256 amountOut) {
+    IUniswapV3Pool pool = IUniswapV3Pool(uniswapFactory.getPool(tokenIn, tokenOut, fee));
+    (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
+
+    uint160 limit = pool.token0() == tokenIn ? sqrtPriceX96 - sqrtPriceX96 / 10 : sqrtPriceX96 + sqrtPriceX96 / 10;
+
+    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: fee,
+      recipient: address(this),
+      deadline: block.timestamp + 1000,
+      amountIn: amountIn,
+      amountOutMinimum: 0,
+      sqrtPriceLimitX96: limit
+    });
+
+    amountOut = uniswapRouter.exactInputSingle(params);
+  }
+
+  function a(uint256 x, uint8 decimals) public pure returns (uint256) {
     return x * 10**decimals;
   }
 }

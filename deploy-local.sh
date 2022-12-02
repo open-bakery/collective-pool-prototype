@@ -18,11 +18,12 @@ ABIS_DIR="$DIST_DIR/abis"
 mkdir -p $ABIS_DIR
 
 declare -A contracts
-contracts[factory]=RangePoolFactory
+contracts[rangePoolFactory]=RangePoolFactory
 contracts[lens]=Lens
-contracts[pool]=RangePool
+contracts[rangePool]=RangePool
 contracts[erc20]=ERC20
 contracts[uniPool]=IUniswapV3Pool
+contracts[router]=ISwapRouter
 contracts[positionManager]=NonfungiblePositionManager
 
 indexImport=""
