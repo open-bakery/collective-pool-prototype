@@ -310,6 +310,12 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     rangePoolManager.attach(address(privateRangePool), strategy);
   }
 
+  function testEthTransactionRevert() public {
+    RangePool privateRangePool = _createRangePool();
+    vm.expectRevert(bytes('RangePoolManagerBase: Eth not supported for this pool.'));
+    rangePoolManager.addLiquidity{ value: 1 ether }(privateRangePool, 10 ether, 10 ether, 1_00);
+  }
+
   function onERC721Received(
     address operator,
     address from,

@@ -274,23 +274,10 @@ contract RangePoolManagerBase is Ownable {
     uint256 _ethAmount = msg.value;
 
     if (_ethAmount != 0) {
-      bool _ethUsed;
-
-      if (_token0 == weth) {
-        _amount0 += _ethAmount;
-        _ethUsed = true;
-      } else if (_token1 == weth) {
-        _amount1 += _ethAmount;
-        _ethUsed = true;
-      }
-
-      if (_ethUsed) {
-        IWETH9(weth).deposit{ value: _ethAmount }();
-      } else {
-        revert('RangePoolManagerBase: Eth not supported for this pool.');
-      }
+      require(_token0 == weth || _token1 == weth, 'RangePoolManagerBase: Eth not supported for this pool.');
+      IWETH9(weth).deposit{ value: _ethAmount }();
+      (_amount0, _amount1) = (_token0 == weth) ? (_amount0 + _ethAmount, _amount1) : (_amount0, _amount1 + _ethAmount);
     }
-
     return (_amount0, _amount1);
   }
 }
