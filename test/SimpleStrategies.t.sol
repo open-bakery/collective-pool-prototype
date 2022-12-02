@@ -29,7 +29,7 @@ contract SimpleStrategiesTest is TestHelpers {
     lowerLimitB = simpleAmount(1_000, tokenB);
     upperLimitB = simpleAmount(2_000, tokenB);
     deployOurBase();
-    rangePoolManager = new RangePoolManager(address(rangePoolFactory));
+    rangePoolManager = new RangePoolManager(address(rangePoolFactory), address(0));
     // Performs swap to record price to Oracle.
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
     simpleStrategies = new SimpleStrategies();

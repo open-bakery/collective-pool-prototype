@@ -10,7 +10,7 @@ testHelpers:; forge test -vv --mc ^TestHelpersTest$
 
 testRangePool:; forge test -vvv --mc ^RangePoolTest$
 
-testRangePoolManager:; forge test -vv --gas-report --mc ^RangePoolManagerTest$
+testRangePoolManager:; forge test -vv --mc ^RangePoolManagerTest$
 
 testSimpleStrategy:; forge test -vv --mc ^SimpleStrategiesTest$
 

@@ -6,7 +6,7 @@ import './RangePoolManagerBase.sol';
 contract RangePoolManager is RangePoolManagerBase {
   using SafeERC20 for ERC20;
 
-  constructor(address rangePoolFactory_) RangePoolManagerBase(rangePoolFactory_) {}
+  constructor(address rangePoolFactory_, address weth_) RangePoolManagerBase(rangePoolFactory_, weth_) {}
 
   function addLiquidity(
     RangePool rangePool,

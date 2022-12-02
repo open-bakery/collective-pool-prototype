@@ -30,7 +30,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     lowerLimitB = simpleAmount(1_000, tokenB);
     upperLimitB = simpleAmount(2_000, tokenB);
     deployOurBase();
-    rangePoolManager = new RangePoolManager(address(rangePoolFactory));
+    rangePoolManager = new RangePoolManager(address(rangePoolFactory), address(0));
     // Performs swap to record price to Oracle.
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
   }
@@ -312,8 +312,31 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
   function testEthTransactionRevert() public {
     RangePool privateRangePool = _createRangePool();
-    vm.expectRevert(bytes('RangePoolManagerBase: Eth not supported for this pool.'));
-    rangePoolManager.addLiquidity{ value: 1 ether }(privateRangePool, 10 ether, 10 ether, 1_00);
+    vm.expectRevert(bytes('RangePoolManager: Eth not supported for this pool.'));
+    rangePoolManager.addLiquidity{ value: 1 ether }(privateRangePool, 0, 0, 1_00);
+  }
+
+  function testEthTransaction() public {
+    rangePoolManager = new RangePoolManager(address(rangePoolFactory), tokenA);
+    RangePool privateRangePool = _createRangePool();
+    (uint128 liquidityAdded, , , , ) = rangePoolManager.addLiquidity{ value: 1 ether }(privateRangePool, 0, 0, 1_00);
+
+    assertTrue(
+      Helper.positionLiquidity(
+        INonfungiblePositionManager(rangePoolFactory.positionManager()),
+        privateRangePool.tokenId()
+      ) == liquidityAdded,
+      'Liquidity balance check'
+    );
+    assertTrue(
+      Helper.positionLiquidity(
+        INonfungiblePositionManager(rangePoolFactory.positionManager()),
+        privateRangePool.tokenId()
+      ) != 0,
+      'Added liquidity'
+    );
+
+    assertTrue(address(tokenA).balance == 1 ether);
   }
 
   function onERC721Received(

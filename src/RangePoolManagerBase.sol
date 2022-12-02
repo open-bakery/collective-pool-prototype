@@ -10,8 +10,9 @@ import './LiquidityProviderToken.sol';
 contract RangePoolManagerBase is Ownable {
   using SafeERC20 for ERC20;
 
-  constructor(address rangePoolFactory_) {
+  constructor(address rangePoolFactory_, address weth_) {
     rangePoolFactory = RangePoolFactory(rangePoolFactory_);
+    weth = weth_;
   }
 
   struct PositionData {
@@ -36,11 +37,6 @@ contract RangePoolManagerBase is Ownable {
   }
 
   event PrivateRangePoolCreated(address indexed rangePool);
-
-  function setWeth(address _weth) external onlyOwner {
-    require(_weth == address(0), 'RangePoolManagerBase: Weth already set');
-    weth = _weth;
-  }
 
   function createPrivateRangePool(
     address tokenA,
@@ -82,7 +78,7 @@ contract RangePoolManagerBase is Ownable {
     address delegate
   )
     public
-    payable
+    virtual
     returns (
       uint128 liquidityAdded,
       uint256 amountAdded0,
@@ -96,10 +92,10 @@ contract RangePoolManagerBase is Ownable {
     address token0 = rangePool.pool().token0();
     address token1 = rangePool.pool().token1();
 
-    (amount0, amount1) = _checkEthDeposit(token0, token1, amount0, amount1);
-
     ERC20(token0).safeTransferFrom(msg.sender, address(this), amount0);
     ERC20(token1).safeTransferFrom(msg.sender, address(this), amount1);
+
+    (amount0, amount1) = _checkEthDeposit(token0, token1, amount0, amount1);
 
     ERC20(token0).safeApprove(address(rangePool), amount0);
     ERC20(token1).safeApprove(address(rangePool), amount1);
@@ -274,7 +270,7 @@ contract RangePoolManagerBase is Ownable {
     uint256 _ethAmount = msg.value;
 
     if (_ethAmount != 0) {
-      require(_token0 == weth || _token1 == weth, 'RangePoolManagerBase: Eth not supported for this pool.');
+      require(_token0 == weth || _token1 == weth, 'RangePoolManager: Eth not supported for this pool.');
       IWETH9(weth).deposit{ value: _ethAmount }();
       (_amount0, _amount1) = (_token0 == weth) ? (_amount0 + _ethAmount, _amount1) : (_amount0, _amount1 + _ethAmount);
     }
