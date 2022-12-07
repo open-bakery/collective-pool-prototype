@@ -52,10 +52,10 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
     initDeployHelpers();
 
     require(weth != address(0), 'WETH needs to be deployed');
-    console.log('deployUniswapBase msg.sender', msg.sender);
+    // console.log('deployUniswapBase msg.sender', msg.sender);
 
     uniswapFactory = new UniswapV3Factory();
-    console.log('uniswapFactory: ', address(uniswapFactory));
+    // console.log('uniswapFactory: ', address(uniswapFactory));
     NonfungibleTokenPositionDescriptor tokenPositionDescriptor = new NonfungibleTokenPositionDescriptor(weth, 'ETH');
     positionManager = new NPM.NonfungiblePositionManager(
       address(uniswapFactory),

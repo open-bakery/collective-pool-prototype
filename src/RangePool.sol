@@ -2,8 +2,6 @@
 pragma solidity >=0.5.0 <0.8.0;
 pragma abicoder v2;
 
-import 'forge-std/Test.sol';
-
 import '@openzeppelin/contracts/utils/Address.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 
@@ -12,7 +10,7 @@ import './libraries/Helper.sol';
 
 // All prices and ranges in Uniswap are denominated in token1 (y) relative to token0 (x): (y/x as in x*y=k)
 //Contract responsible for creating new pools.
-contract RangePool is IRangePool, Ownable, Test {
+contract RangePool is IRangePool, Ownable {
   using SafeERC20 for ERC20;
   using Address for address;
   using SafeMath for uint256;
