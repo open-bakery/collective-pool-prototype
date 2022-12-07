@@ -37,17 +37,16 @@ library Swapper {
 
     ERC20(params.tokenIn).safeApprove(router, params.amountIn);
 
+    uint160 sqrtPriceX96;
+    if (params.oracleSeconds == 0) {
+      sqrtPriceX96 = Conversion.sqrtPriceX96(swapPool);
+    } else {
+      sqrtPriceX96 = Conversion.oracleSqrtPricex96(swapPool, params.oracleSeconds);
+    }
+
     uint256 expectedAmountOut = params.tokenOut == swapPool.token0()
-      ? Conversion.convert1ToToken0(
-        Conversion.oracleSqrtPricex96(swapPool, params.oracleSeconds),
-        params.amountIn,
-        ERC20(swapPool.token0()).decimals()
-      )
-      : Conversion.convert0ToToken1(
-        Conversion.oracleSqrtPricex96(swapPool, params.oracleSeconds),
-        params.amountIn,
-        ERC20(swapPool.token0()).decimals()
-      );
+      ? Conversion.convert1ToToken0(sqrtPriceX96, params.amountIn, ERC20(swapPool.token0()).decimals())
+      : Conversion.convert0ToToken1(sqrtPriceX96, params.amountIn, ERC20(swapPool.token0()).decimals());
 
     uint256 amountOutMinimum = Helper.applySlippageTolerance(false, expectedAmountOut, params.slippage);
 

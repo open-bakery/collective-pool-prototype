@@ -110,9 +110,7 @@ contract RangePoolManagerBase is Ownable {
       _safeTransferTokens(msg.sender, token0, token1, amountRefunded0, amountRefunded1);
     }
 
-    if (!isPrivate) {
-      // Code for collective pools
-      // PositionData memory cachePosition;
+    if (isPrivate) {} else {
       if (liquitityToken[address(rangePool)] == address(0))
         liquitityToken[address(rangePool)] = address(new LiquidityProviderToken(rangePool.tokenId()));
 
@@ -131,17 +129,15 @@ contract RangePoolManagerBase is Ownable {
 
     (amountRemoved0, amountRemoved1) = rangePool.removeLiquidity(liquidityAmount, slippage);
 
-    if (!isPrivate) {
-      // Code for collective pools
-    }
-
-    _safeTransferTokens(
-      msg.sender,
-      rangePool.pool().token0(),
-      rangePool.pool().token1(),
-      amountRemoved0,
-      amountRemoved1
-    );
+    if (isPrivate) {
+      _safeTransferTokens(
+        msg.sender,
+        rangePool.pool().token0(),
+        rangePool.pool().token1(),
+        amountRemoved0,
+        amountRemoved1
+      );
+    } else {}
   }
 
   function collectFees(RangePool rangePool, address delegate)
@@ -157,11 +153,9 @@ contract RangePoolManagerBase is Ownable {
 
     (tokenCollected0, tokenCollected1, collectedFees0, collectedFees1) = rangePool.collectFees();
 
-    if (!isPrivate) {
-      // Code for collective pools
-    }
-
-    _safeTransferTokens(msg.sender, tokenCollected0, tokenCollected1, collectedFees0, collectedFees1);
+    if (isPrivate) {
+      _safeTransferTokens(msg.sender, tokenCollected0, tokenCollected1, collectedFees0, collectedFees1);
+    } else {}
   }
 
   function updateRange(
@@ -183,26 +177,24 @@ contract RangePoolManagerBase is Ownable {
   {
     bool isPrivate = _checkIfPrivate(address(rangePool), msg.sender, delegate);
 
-    (liquidityAdded, amountAdded0, amountAdded1, amountRefunded0, amountRefunded1) = rangePool.updateRange(
-      tokenA,
-      lowerLimitA,
-      upperLimitA,
-      slippage
-    );
-
-    if (!isPrivate) {
-      // Code for collective pools
-    }
-
-    if (amountRefunded0 + amountRefunded1 != 0) {
-      _safeTransferTokens(
-        msg.sender,
-        rangePool.pool().token0(),
-        rangePool.pool().token1(),
-        amountRefunded0,
-        amountRefunded1
+    if (isPrivate) {
+      (liquidityAdded, amountAdded0, amountAdded1, amountRefunded0, amountRefunded1) = rangePool.updateRange(
+        tokenA,
+        lowerLimitA,
+        upperLimitA,
+        slippage
       );
-    }
+
+      if (amountRefunded0 + amountRefunded1 != 0) {
+        _safeTransferTokens(
+          msg.sender,
+          rangePool.pool().token0(),
+          rangePool.pool().token1(),
+          amountRefunded0,
+          amountRefunded1
+        );
+      }
+    } else {}
   }
 
   function claimNFT(RangePool rangePool, address recipient) external {

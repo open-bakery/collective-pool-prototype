@@ -37,36 +37,9 @@ contract RangePoolTest is LogsTest {
     oracleSeconds = 60;
     lowerLimitB = simpleAmount(1_000, tokenB);
     upperLimitB = simpleAmount(2_000, tokenB);
-  }
-
-  function testRangePool() public {
-    uint16 slippage = 10_00;
-    initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
     // Performs swap to record price to Oracle.
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
-    addLiquidity(simpleAmount(20_000, tokenB), 5 ether, slippage);
-    increaseLiquidity(simpleAmount(4_000, tokenB), 0, slippage);
-    removeLiquidity(uint128(_getLiquidity(rangePool).div(100)), slippage);
-    performSwaps(tokenA, simpleAmount(10_000, tokenA), tokenB, fee, 10);
-    logPrices(rangePool);
-    collectFees();
-    performSwaps(tokenA, simpleAmount(10_000, tokenA), tokenB, fee, 10);
-    updateRange(tokenB, simpleAmount(800, tokenB), simpleAmount(1_500, tokenB), slippage);
-  }
-
-  function testPoolConstruct() public {
-    uint256 lowerLimit = 0.001 ether;
-    uint256 upperLimit = 0.0005 ether;
-    initialize(tokenB, tokenA, fee, 60, lowerLimit, upperLimit);
-    (int24 lowerTick, int24 upperTick) = Helper.validateAndConvertLimits(
-      rangePool.pool(),
-      tokenA,
-      lowerLimit,
-      upperLimit
-    );
-
-    assertTrue(rangePool.lowerTick() == lowerTick);
-    assertTrue(rangePool.upperTick() == upperTick);
+    initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
   }
 
   function initialize(
@@ -95,25 +68,49 @@ contract RangePoolTest is LogsTest {
     ERC20(_token1).approve(address(rangePool), type(uint256).max);
   }
 
-  function addLiquidity(
-    uint256 amount0,
-    uint256 amount1,
-    uint16 slippage
-  ) internal {
+  function testRangePool() public {
+    // Performs swap to record price to Oracle.
+    // performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+    // addLiquidity(simpleAmount(20_000, tokenB), 5 ether, slippage);
+    // increaseLiquidity(simpleAmount(4_000, tokenB), 0, slippage);
+    // removeLiquidity(uint128(_getLiquidity(rangePool).div(100)), slippage);
+    // performSwaps(tokenA, simpleAmount(10_000, tokenA), tokenB, fee, 10);
+    // logPrices(rangePool);
+    // collectFees();
+    // performSwaps(tokenA, simpleAmount(10_000, tokenA), tokenB, fee, 10);
+    // updateRange(tokenB, simpleAmount(800, tokenB), simpleAmount(1_500, tokenB), slippage);
+  }
+
+  function testPoolConstruct() public {
+    uint256 lowerLimit = 0.001 ether;
+    uint256 upperLimit = 0.0005 ether;
+    initialize(tokenB, tokenA, fee, 60, lowerLimit, upperLimit);
+    (int24 lowerTick, int24 upperTick) = Helper.validateAndConvertLimits(
+      rangePool.pool(),
+      tokenA,
+      lowerLimit,
+      upperLimit
+    );
+
+    assertTrue(rangePool.lowerTick() == lowerTick);
+    assertTrue(rangePool.upperTick() == upperTick);
+  }
+
+  function testAddLiquidity() public {
+    uint256 amount0 = 200_000 ether;
+    uint256 amount1 = 100 ether;
+    uint16 slippage = 10_00;
+
     deal(rangePool.pool().token0(), address(this), amount0);
     deal(rangePool.pool().token1(), address(this), amount1);
 
-    (uint128 liquidityAdded, uint256 amount0Added, uint256 amount1Added, , ) = rangePool.addLiquidity(
-      amount0,
-      amount1,
-      slippage
-    );
-
-    logr(
-      'testAddLiquidity()',
-      ['liquidityAdded', 'amount0Added', 'amount1Added', '0', '0', '0'],
-      [uint256(liquidityAdded), amount0Added, amount1Added, 0, 0, 0]
-    );
+    (
+      uint128 liquidityAdded,
+      uint256 amountAdded0,
+      uint256 amountAdded1,
+      uint256 amountRefunded0,
+      uint256 amountRefunded1
+    ) = rangePool.addLiquidity(amount0, amount1, slippage);
 
     assertTrue(Helper.positionLiquidity(rangePool.positionManager(), rangePool.tokenId()) == liquidityAdded);
     assertTrue(liquidityAdded > 0);

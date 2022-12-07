@@ -14,7 +14,7 @@ contract DepositRatioCalculatorTest is TestHelpers {
 
   function setUp() public {
     balanceETH = 0 ether; // ERC20(WETH).balanceOf(wallet);
-    balanceUSDC = 15_000_000000; // ERC20(USDC).balanceOf(wallet);
+    balanceUSDC = 14_600_000000; // ERC20(USDC).balanceOf(wallet);
   }
 
   function testDepositRatioCalculator() public view {
@@ -27,8 +27,8 @@ contract DepositRatioCalculatorTest is TestHelpers {
       500,
       amountA,
       amountB,
-      800_370000,
-      1280_500000
+      1069_600000,
+      1480_400000
     );
 
     logr(
