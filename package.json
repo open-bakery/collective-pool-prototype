@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "concurrently --names 'NODE,DEPL' --prefix '({name})' --prefix-colors 'yellow.bold,cyan.bold' 'yarn start' 'wait-on -c wait-on.config.js && yarn deploy:local'",
     "deploy:local": "./deploy-local.sh",
-    "start": "./start.sh"
+    "start": "./start.sh",
+    "test1": "forge test -vvv --match-contract "
   },
   "devDependencies": {
     "concurrently": "^7.4.0",

@@ -37,15 +37,23 @@ contract DeployRangePools is DeployHelpers, ScriptHelpers {
     vm.startBroadcast(BOB_KEY);
     console.log('deploying as bob', BOB_KEY);
     console.log('bobs address', vm.addr(BOB_KEY));
-    RangePool poolB1 = createRangePool(poolProps[1], amount(1000), amount(2000));
-    poolB1.addLiquidity(amount(5), amount(5), maxSlippage);
+    RangePool poolB1 = createPrivateRangePool(poolProps[1], amount(1000), amount(2000));
+    rangePoolManager.addLiquidity(poolB1, amount(5), amount(5), maxSlippage);
     /*
     RangePool poolB2 = createRangePool(1, amount(1100), amount(1800));
     poolB2.addLiquidity(amount(5), amount(5), maxSlippage);
 */
     vm.stopBroadcast();
 
+    vm.startBroadcast(ALICE_KEY);
+    Token(tokens.weth).approve(address(uniswapRouter), maxAllowance);
+    Token(tokens.dai).approve(address(uniswapRouter), maxAllowance);
+    swap(tokens.weth, tokens.dai, poolProps[1].fee, a(1, 18));
+    vm.stopBroadcast();
+
     outputProp('lens', vm.toString(address(lens)));
     outputProp('rangePoolFactory', vm.toString(address(rangePoolFactory)));
+    outputProp('rangePoolManager', vm.toString(address(rangePoolManager)));
+    writeAddress('rangePoolFactory', address(rangePoolFactory));
   }
 }

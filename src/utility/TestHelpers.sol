@@ -16,31 +16,6 @@ abstract contract TestHelpers is DeployHelpers, Logs {
     return amount * (10**ERC20(token).decimals());
   }
 
-  function swap(
-    address tokenIn,
-    address tokenOut,
-    uint24 fee,
-    uint256 amountIn
-  ) internal returns (uint256 amountOut) {
-    IUniswapV3Pool pool = IUniswapV3Pool(uniswapFactory.getPool(tokenIn, tokenOut, fee));
-    (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
-
-    uint160 limit = pool.token0() == tokenIn ? sqrtPriceX96 - sqrtPriceX96 / 10 : sqrtPriceX96 + sqrtPriceX96 / 10;
-
-    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,
-      fee: fee,
-      recipient: address(this),
-      deadline: block.timestamp,
-      amountIn: amountIn,
-      amountOutMinimum: 0,
-      sqrtPriceLimitX96: limit
-    });
-
-    amountOut = uniswapRouter.exactInputSingle(params);
-  }
-
   function performSwaps(
     address tokenA,
     uint256 amountA,
