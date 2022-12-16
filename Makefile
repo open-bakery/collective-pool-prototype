@@ -16,7 +16,8 @@ testSimpleStrategy:; forge test -vv --mc ^SimpleStrategiesTest$
 
 testLocal:; forge test -vvv --match-test testAnvil*
 
-testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(FORK_RPC_URL)
+#testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(FORK_RPC_URL)
+testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(ARBITRUM_RPC_ALCHEMY)
 
 # testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
 testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL) --gas-report
