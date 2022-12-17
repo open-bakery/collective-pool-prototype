@@ -11,21 +11,21 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import './RangePoolManager.sol';
 
 contract CollectivePoolStrategy {
-  //   using SafeERC20 for ERC20;
-  //   using SafeMath for uint256;
-  //   struct PositionData {
-  //     uint128 liquidity;
-  //     uint256 claimedFees0;
-  //     uint256 claimedFees1;
-  //     uint256 feeDebt0;
-  //     uint256 feeDebt1;
-  //   }
-  //   uint256 precision = 1 ether;
-  //   uint256 accFeePerLiquidity0;
-  //   uint256 accFeePerLiquidity1;
-  //   mapping(address => address) public liquitityToken; // liquidityToken[rangePool] = address;
-  //   mapping(address => mapping(address => PositionData)) public position; // position[rangePool][user] = PositionData;
-  //   function addLiquidity(
+  using SafeERC20 for ERC20;
+  using SafeMath for uint256;
+  struct PositionData {
+    uint128 liquidity;
+    uint256 claimedFees0;
+    uint256 claimedFees1;
+    uint256 feeDebt0;
+    uint256 feeDebt1;
+  }
+  uint256 precision = 1 ether;
+  uint256 accFeePerLiquidity0;
+  uint256 accFeePerLiquidity1;
+  // mapping(address => address) public liquitityToken; // liquidityToken[rangePool] = address;
+  mapping(address => mapping(address => PositionData)) public position; // position[rangePool][user] = PositionData;
+  // function addLiquidity(
   //     RangePool rangePool,
   //     uint256 amount0,
   //     uint256 amount1,

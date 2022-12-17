@@ -201,7 +201,7 @@ contract SimpleStrategies {
     uint256 minimumAmount
   ) private {
     if (ERC20(token).allowance(address(this), spender) < minimumAmount) {
-      ERC20(token).safeApprove(spender, type(uint256).max);
+      ERC20(token).approve(spender, type(uint256).max);
     }
   }
 }

@@ -38,6 +38,15 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
   function testCreatePrivateRangePool() public {
     RangePool privateRangePool = _createPrivateRangePool();
+    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(privateRangePool)));
+    uint256 id = privateRangePool.tokenId();
+
+    assertTrue(
+      keccak256(abi.encodePacked(lp.symbol())) == keccak256(abi.encodePacked('LP_', Strings.toString(id))),
+      'Token symbol'
+    );
+
+    assertTrue(lp.owner() == address(rangePoolManager), 'Token ownership');
 
     assertTrue(
       address(privateRangePool.pool()) == Helper.getPoolAddress(tokenA, tokenB, fee, rangePoolFactory.uniswapFactory())
@@ -49,8 +58,12 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
   function testPrivatePoolAddLiquidity() public {
     RangePool privateRangePool = _createPrivateRangePool();
+    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(privateRangePool)));
 
     (uint128 liquidityAdded, uint256 amountAdded0, uint256 amountAdded1, , ) = _addLiquidity(privateRangePool);
+
+    assertTrue(lp.balanceOf(address(this)) == liquidityAdded, 'LP Balance Check');
+    assertTrue(liquidityAdded != 0, 'Liquidity > 0');
 
     assertTrue(
       Helper.positionLiquidity(
@@ -81,12 +94,13 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     address prankster = address(0xdad);
     _approveAndDeal(tokenB, tokenA, amount0, amount1, address(rangePoolManager), prankster);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
     rangePoolManager.addLiquidity(privateRangePool, amount0, amount1, slippage);
   }
 
   function testPrivatePoolRemoveLiquidity() public {
     RangePool privateRangePool = _createPrivateRangePool();
+    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(privateRangePool)));
     (uint128 liquidityAdded, , , , ) = _addLiquidity(privateRangePool);
     uint128 liquidityToRemove = liquidityAdded / 2;
     (uint160 sqrtPriceX96, , , , , , ) = privateRangePool.pool().slot0();
@@ -110,6 +124,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
       privateRangePool.pool().token1()
     );
 
+    assertTrue(lp.balanceOf(address(this)) == liquidityAdded - liquidityToRemove, 'Burn lp check');
     assertTrue(expected0 == removed0);
     assertTrue(expected1 == removed1);
     assertTrue(currentBalance0 == prevBalance0 + removed0);
@@ -121,7 +136,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     (uint128 liquidityAdded, , , , ) = _addLiquidity(privateRangePool);
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
     rangePoolManager.removeLiquidity(privateRangePool, liquidityAdded, 1_00);
   }
 
@@ -181,7 +196,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
     rangePoolManager.collectFees(privateRangePool);
   }
 
@@ -281,7 +296,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Range Pool is private'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
 
     rangePoolManager.updateRange(privateRangePool, token1, newLowerRange, newUpperRange, 1_00);
   }
@@ -338,63 +353,6 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     assertTrue(address(tokenA).balance == 1 ether);
   }
 
-  function testClone() public {
-    RangePool privateRangePool = _createPrivateRangePool();
-    RangePool clonedRangePool = RangePool(rangePoolManager.cloneRangePool(privateRangePool, true));
-
-    assertTrue(privateRangePool.pool() == clonedRangePool.pool(), 'Pool address comparison');
-    assertTrue(privateRangePool.lowerTick() == clonedRangePool.lowerTick(), 'Lowertick comparison');
-    assertTrue(privateRangePool.upperTick() == clonedRangePool.upperTick(), 'Uppertick comparison');
-    assertTrue(rangePoolManager.rangePoolOwner(address(privateRangePool)) == address(this), 'Ownership check');
-  }
-
-  function testCollectivePoolLPMint() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
-    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(collectiveRangePool)));
-    uint256 id = collectiveRangePool.tokenId();
-    assertTrue(
-      keccak256(abi.encodePacked(lp.symbol())) == keccak256(abi.encodePacked('LP_', Strings.toString(id))),
-      'Token symbol'
-    );
-    assertTrue(lp.owner() == address(rangePoolManager), 'Token ownership');
-  }
-
-  function testCollectivePoolAddLiquidity() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
-    (uint128 _liquidityAdded, , , , ) = _addLiquidity(collectiveRangePool);
-
-    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(collectiveRangePool)));
-    assertTrue(lp.balanceOf(address(this)) == _liquidityAdded);
-    assertTrue(_liquidityAdded != 0);
-  }
-
-  function testCollectivePoolRemoveLiquidity() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
-
-    (uint128 _liquidityAdded, , , , ) = _addLiquidity(collectiveRangePool);
-    (uint256 initialBalance0, uint256 initialBalance1) = _tokenBalances(
-      collectiveRangePool.pool().token0(),
-      collectiveRangePool.pool().token1()
-    );
-    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(collectiveRangePool)));
-    uint256 liquidity = lp.balanceOf(address(this));
-    (uint256 amountRemoved0, uint256 amountRemoved1) = rangePoolManager.removeLiquidity(
-      collectiveRangePool,
-      uint128(liquidity),
-      1_00
-    );
-    (uint256 currentBalance0, uint256 currentBalance1) = _tokenBalances(
-      collectiveRangePool.pool().token0(),
-      collectiveRangePool.pool().token1()
-    );
-
-    assertTrue(lp.balanceOf(address(this)) == 0, 'Liquidity check');
-    assertTrue(amountRemoved0 != 0, 'Removed amount0 check');
-    assertTrue(amountRemoved1 != 0, 'Removed amount1 check');
-    assertTrue(currentBalance0 == initialBalance0 + amountRemoved0, 'Balance0 check');
-    assertTrue(currentBalance1 == initialBalance1 + amountRemoved1, 'Balance1 check');
-  }
-
   function onERC721Received(
     address operator,
     address from,
@@ -434,7 +392,15 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
   function _createCollectiveRangePool() private returns (RangePool _rangePool) {
     _rangePool = RangePool(
-      rangePoolManager.createCollectiveRangePool(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB)
+      rangePoolManager.createCollectiveRangePool(
+        tokenA,
+        tokenB,
+        fee,
+        oracleSeconds,
+        lowerLimitB,
+        upperLimitB,
+        address(0xfff)
+      )
     );
   }
 
