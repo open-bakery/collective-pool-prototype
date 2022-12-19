@@ -2,39 +2,13 @@
 pragma solidity >=0.6.0 <0.9.0;
 pragma abicoder v2;
 
-import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import '@uniswap/v3-periphery/contracts/libraries/PositionValue.sol';
 
-import '../src/utility/TestHelpers.sol';
 import '../src/LiquidityProviderToken.sol';
+import './ARangePoolManager.t.sol';
 
-contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
+contract RangePoolManagerTest is ARangePoolManagerTest {
   using PositionValue for INonfungiblePositionManager;
-  IUniswapV3Pool deployedPool;
-
-  address public tokenA;
-  address public tokenB;
-  uint24 public fee;
-  uint32 public oracleSeconds;
-  uint256 public lowerLimitB;
-  uint256 public upperLimitB;
-
-  function setUp() public {
-    deployAndDistributeTokens();
-    deployUniswapBase(tokens.weth);
-    initPoolProps();
-    deployedPool = createUniswapPool(poolProps[1], 10_000, 10_500_000, 1500);
-    tokenA = poolProps[1].tokenA; // weth
-    tokenB = poolProps[1].tokenB; // dai
-    fee = poolProps[1].fee;
-    oracleSeconds = 60;
-    lowerLimitB = simpleAmount(1_000, tokenB);
-    upperLimitB = simpleAmount(2_000, tokenB);
-    deployOurBase();
-    rangePoolManager = new RangePoolManager(address(rangePoolFactory), address(0));
-    // Performs swap to record price to Oracle.
-    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
-  }
 
   function testCreatePrivateRangePool() public {
     RangePool privateRangePool = _createPrivateRangePool();
@@ -94,7 +68,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     address prankster = address(0xdad);
     _approveAndDeal(tokenB, tokenA, amount0, amount1, address(rangePoolManager), prankster);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in private pool'));
     rangePoolManager.addLiquidity(privateRangePool, amount0, amount1, slippage);
   }
 
@@ -136,7 +110,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     (uint128 liquidityAdded, , , , ) = _addLiquidity(privateRangePool);
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in private pool'));
     rangePoolManager.removeLiquidity(privateRangePool, liquidityAdded, 1_00);
   }
 
@@ -159,7 +133,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Only private pool owners can claim NFTs'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not range pool owner'));
     rangePoolManager.claimNFT(privateRangePool, prankster);
   }
 
@@ -196,7 +170,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in private pool'));
     rangePoolManager.collectFees(privateRangePool);
   }
 
@@ -296,15 +270,9 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
 
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in private pool'));
 
     rangePoolManager.updateRange(privateRangePool, token1, newLowerRange, newUpperRange, 1_00);
-  }
-
-  function testPoolManagerAdmin() public {
-    RangePool privateRangePool = _createPrivateRangePool();
-
-    assertTrue(rangePoolManager.isRangePoolAdmin(address(privateRangePool), address(this)), 'Admin registration');
   }
 
   function testAttachStrategy() public {
@@ -320,7 +288,7 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     address strategy = address(0x111);
     address prankster = address(0xdad);
     vm.prank(prankster);
-    vm.expectRevert(bytes('RangePoolManagerBase: Caller not range pool admin'));
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not range pool owner'));
     rangePoolManager.attach(address(privateRangePool), strategy);
   }
 
@@ -353,79 +321,72 @@ contract RangePoolManagerTest is TestHelpers, IERC721Receiver {
     assertTrue(address(tokenA).balance == 1 ether);
   }
 
-  function onERC721Received(
-    address operator,
-    address from,
-    uint256 tokenId,
-    bytes calldata data
-  ) external pure override returns (bytes4) {
-    operator;
-    from;
-    tokenId;
-    data;
-    return bytes4(keccak256('onERC721Received(address,address,uint256,bytes)'));
+  function testDeployCollectiveRangePool() public {
+    RangePool collectiveRangePool = _createCollectiveRangePool();
+    assertTrue(rangePoolManager.rangePoolOwner(address(collectiveRangePool)) == address(0), 'No owner check');
+    assertTrue(address(rangePoolManager.rangePoolLP(address(collectiveRangePool))) != address(0), 'LP minted check');
   }
 
-  function _addLiquidity(RangePool _rangePool)
-    private
-    returns (
-      uint128 _liquidityAdded,
-      uint256 _amountAdded0,
-      uint256 _amountAdded1,
-      uint256 _amountRefunded0,
-      uint256 _amountRefunded1
-    )
-  {
-    uint256 _amount0 = 10_000 ether; // DAI
-    uint256 _amount1 = 10 ether; // WETH
-    uint16 _slippage = 1_00;
+  function testCollectiveRangePoolAddLiquidity() public {
+    RangePool collectiveRangePool = _createCollectiveRangePool();
+    (uint128 liquidityAdded, , , , ) = _addLiquidity(collectiveRangePool);
+    LiquidityProviderToken lp = rangePoolManager.rangePoolLP(address(collectiveRangePool));
+    assertTrue(lp.balanceOf(address(this)) == liquidityAdded, 'Liquidity Added Check');
+  }
 
-    _approveAndDeal(tokenB, tokenA, _amount0, _amount1, address(rangePoolManager), address(this));
-
-    (_liquidityAdded, _amountAdded0, _amountAdded1, _amountRefunded0, _amountRefunded1) = rangePoolManager.addLiquidity(
-      _rangePool,
-      _amount0,
-      _amount1,
-      _slippage
+  function testCollectivePoolRemoveLiquidity() public {
+    RangePool collectiveRangePool = _createCollectiveRangePool();
+    _addLiquidity(collectiveRangePool);
+    (uint256 initialBalance0, uint256 initialBalance1) = _tokenBalances(
+      collectiveRangePool.pool().token0(),
+      collectiveRangePool.pool().token1()
     );
-  }
-
-  function _createCollectiveRangePool() private returns (RangePool _rangePool) {
-    _rangePool = RangePool(
-      rangePoolManager.createCollectiveRangePool(
-        tokenA,
-        tokenB,
-        fee,
-        oracleSeconds,
-        lowerLimitB,
-        upperLimitB,
-        address(0xfff)
-      )
+    LiquidityProviderToken lp = LiquidityProviderToken(rangePoolManager.rangePoolLP(address(collectiveRangePool)));
+    uint256 liquidity = lp.balanceOf(address(this));
+    (uint256 amountRemoved0, uint256 amountRemoved1) = rangePoolManager.removeLiquidity(
+      collectiveRangePool,
+      uint128(liquidity),
+      1_00
     );
-  }
-
-  function _createPrivateRangePool() private returns (RangePool _rangePool) {
-    _rangePool = RangePool(
-      rangePoolManager.createPrivateRangePool(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB)
+    (uint256 currentBalance0, uint256 currentBalance1) = _tokenBalances(
+      collectiveRangePool.pool().token0(),
+      collectiveRangePool.pool().token1()
     );
+    assertTrue(lp.balanceOf(address(this)) == 0, 'Liquidity check');
+    assertTrue(amountRemoved0 != 0, 'Removed amount0 check');
+    assertTrue(amountRemoved1 != 0, 'Removed amount1 check');
+    assertTrue(currentBalance0 == initialBalance0 + amountRemoved0, 'Balance0 check');
+    assertTrue(currentBalance1 == initialBalance1 + amountRemoved1, 'Balance1 check');
   }
 
-  function _tokenBalances(address _tokenA, address _tokenB) public view returns (uint256 _amountA, uint256 _amountB) {
-    _amountA = ERC20(_tokenA).balanceOf(address(this));
-    _amountB = ERC20(_tokenB).balanceOf(address(this));
+  function testCollectivePoolRemoveLiquidityRevert() public {
+    RangePool collectiveRangePool = _createCollectiveRangePool();
+    (uint128 _liquidityAdded, , , , ) = _addLiquidity(collectiveRangePool);
+    vm.expectRevert(bytes('RangePoolManagerBase: Not enough liquidity balance'));
+    rangePoolManager.removeLiquidity(collectiveRangePool, uint128(_liquidityAdded * 2), 1_00);
   }
 
-  function _approveAndDeal(
-    address _tokenA,
-    address _tokenB,
-    uint256 _amountA,
-    uint256 _amountB,
-    address _spender,
-    address _receiver
-  ) internal {
-    ERC20(_tokenA).approve(address(_spender), type(uint256).max);
-    ERC20(_tokenB).approve(address(_spender), type(uint256).max);
-    deal(_tokenA, _receiver, _amountA);
-    deal(_tokenB, _receiver, _amountB);
+  function testCollectivePoolCollectFeesRevert() public {
+    RangePool collectiveRangePool = _createCollectiveRangePool();
+    _addLiquidity(collectiveRangePool);
+    performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in collective pool'));
+    rangePoolManager.collectFees(collectiveRangePool);
+  }
+
+  function testCollectivePoolUpdateRangeRevert() public {
+    RangePool collectiveRangePool = _createCollectiveRangePool();
+    _addLiquidity(collectiveRangePool);
+    address token1 = collectiveRangePool.pool().token1();
+    uint256 newLowerRange = Conversion.convertTickToPriceUint(
+      collectiveRangePool.lowerTick(),
+      ERC20(collectiveRangePool.pool().token0()).decimals()
+    ) / 2;
+    uint256 newUpperRange = Conversion.convertTickToPriceUint(
+      collectiveRangePool.upperTick(),
+      ERC20(collectiveRangePool.pool().token0()).decimals()
+    ) * 2;
+    vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in collective pool'));
+    rangePoolManager.updateRange(collectiveRangePool, token1, newLowerRange, newUpperRange, 1_00);
   }
 }

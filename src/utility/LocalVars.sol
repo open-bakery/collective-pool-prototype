@@ -17,7 +17,6 @@ import '../Lens.sol';
 import '../RangePoolManager.sol';
 import '../RangePoolFactory.sol';
 import '../RangePool.sol';
-import '../SimpleStrategies.sol';
 import './Token.sol';
 
 abstract contract LocalVars is Test {
@@ -42,7 +41,6 @@ abstract contract LocalVars is Test {
   RangePoolFactory public rangePoolFactory;
   RangePoolManager public rangePoolManager;
   RangePool public rangePool;
-  SimpleStrategies public simpleStrategies;
   Lens public lens;
 
   address public ARB_WETH = vm.envAddress('ARB_WETH');

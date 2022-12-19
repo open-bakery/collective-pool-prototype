@@ -29,8 +29,8 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
     upperLimitB = 0.0005 ether;
     lens = new Lens();
   }
-
-  function testArbitrum() public {
+  /*
+    function testArbitrum() public {
     uint16 slippage = 100_00;
     initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
     addLiquidity(20_000_000000, 5 ether, slippage);
@@ -229,4 +229,5 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
     _amount0 = ERC20(rangePool.pool().token0()).balanceOf(address(this));
     _amount1 = ERC20(rangePool.pool().token1()).balanceOf(address(this));
   }
+  */
 }

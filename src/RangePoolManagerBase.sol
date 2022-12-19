@@ -13,7 +13,6 @@ contract RangePoolManagerBase is Ownable {
   struct RangePoolData {
     address owner;
     address lp;
-    mapping(address => bool) isAdmin;
     mapping(address => bool) isRegisteredStrategy;
   }
 
@@ -27,13 +26,14 @@ contract RangePoolManagerBase is Ownable {
 
   mapping(address => RangePoolData) public rangePoolInfo;
 
-  modifier onlyAdmin(address rangePool) {
-    require(isRangePoolAdmin(rangePool, msg.sender), 'RangePoolManagerBase: Caller not range pool admin');
+  modifier onlyRangePoolOwner(address rangePool) {
+    require(rangePoolOwner(rangePool) == msg.sender, 'RangePoolManagerBase: Caller not range pool owner');
     _;
   }
 
   event PrivateRangePoolCreated(address indexed rangePool, address indexed createdBy);
   event CollectiveRangePoolCreated(address indexed rangePool, address indexed createdBy);
+  event StrategyAttached(address indexed rangePool, address indexed strategy, address creator);
 
   function rangePoolOwner(address rangePool) public view returns (address) {
     return rangePoolInfo[rangePool].owner;
@@ -41,10 +41,6 @@ contract RangePoolManagerBase is Ownable {
 
   function rangePoolLP(address rangePool) public view returns (LiquidityProviderToken) {
     return LiquidityProviderToken(rangePoolInfo[rangePool].lp);
-  }
-
-  function isRangePoolAdmin(address rangePool, address account) public view returns (bool) {
-    return rangePoolInfo[rangePool].isAdmin[account];
   }
 
   function isRegistered(address rangePool, address strategy) public view returns (bool) {
@@ -72,11 +68,7 @@ contract RangePoolManagerBase is Ownable {
       upperLimitInTokenB
     );
 
-    RangePoolData storage rpd = rangePoolInfo[rangePool];
-    rpd.owner = msg.sender;
-    rpd.isAdmin[msg.sender] = true;
-    rpd.lp = address(new LiquidityProviderToken(RangePool(rangePool).tokenId()));
-
+    _initiateRangePoolData(rangePool, msg.sender, address(0));
     emit PrivateRangePoolCreated(rangePool, msg.sender);
   }
 
@@ -98,10 +90,8 @@ contract RangePoolManagerBase is Ownable {
       upperLimitInTokenB
     );
 
-    RangePoolData storage rpd = rangePoolInfo[rangePool];
     require(strategy != address(0), 'RangePoolManagerBase: Collective pools must have strategies');
-    rpd.lp = address(new LiquidityProviderToken(RangePool(rangePool).tokenId()));
-    rpd.isRegisteredStrategy[strategy] = true;
+    _initiateRangePoolData(rangePool, address(0), strategy);
 
     emit CollectiveRangePoolCreated(rangePool, msg.sender);
   }
@@ -123,7 +113,7 @@ contract RangePoolManagerBase is Ownable {
       uint256 amountRefunded1
     )
   {
-    _checkIfCallerAllowed(address(rangePool), msg.sender, delegate);
+    _authenticatePrivatePoolAccess(address(rangePool), msg.sender, delegate);
 
     address token0 = rangePool.pool().token0();
     address token1 = rangePool.pool().token1();
@@ -155,7 +145,7 @@ contract RangePoolManagerBase is Ownable {
     uint16 slippage,
     address delegate
   ) public returns (uint256 amountRemoved0, uint256 amountRemoved1) {
-    _checkIfCallerAllowed(address(rangePool), msg.sender, delegate);
+    _authenticatePrivatePoolAccess(address(rangePool), msg.sender, delegate);
 
     require(
       rangePoolLP(address(rangePool)).balanceOf(msg.sender) >= liquidityAmount,
@@ -183,7 +173,8 @@ contract RangePoolManagerBase is Ownable {
       uint256 collectedFees1
     )
   {
-    _checkIfCallerAllowed(address(rangePool), msg.sender, delegate);
+    _authenticatePrivatePoolAccess(address(rangePool), msg.sender, delegate);
+    _authenticateCollectivePoolAccess(address(rangePool), msg.sender);
 
     (tokenCollected0, tokenCollected1, collectedFees0, collectedFees1) = rangePool.collectFees();
     _safeTransferTokens(msg.sender, tokenCollected0, tokenCollected1, collectedFees0, collectedFees1);
@@ -206,7 +197,8 @@ contract RangePoolManagerBase is Ownable {
       uint256 amountRefunded1
     )
   {
-    _checkIfCallerAllowed(address(rangePool), msg.sender, delegate);
+    _authenticatePrivatePoolAccess(address(rangePool), msg.sender, delegate);
+    _authenticateCollectivePoolAccess(address(rangePool), msg.sender);
 
     (liquidityAdded, amountAdded0, amountAdded1, amountRefunded0, amountRefunded1) = rangePool.updateRange(
       tokenA,
@@ -226,17 +218,26 @@ contract RangePoolManagerBase is Ownable {
     }
   }
 
-  function claimNFT(RangePool rangePool, address recipient) external {
-    require(
-      rangePoolInfo[address(rangePool)].owner == msg.sender,
-      'RangePoolManagerBase: Only private pool owners can claim NFTs'
-    );
+  function claimNFT(RangePool rangePool, address recipient) external onlyRangePoolOwner(address(rangePool)) {
     rangePool.claimNFT(recipient);
   }
 
-  function attach(address rangePool, address strategy) external onlyAdmin(rangePool) {
+  function attach(address rangePool, address strategy) external onlyRangePoolOwner(address(rangePool)) {
     RangePoolData storage rdp = rangePoolInfo[rangePool];
     rdp.isRegisteredStrategy[strategy] = true;
+
+    emit StrategyAttached(rangePool, strategy, msg.sender);
+  }
+
+  function _initiateRangePoolData(
+    address _rangePool,
+    address _owner,
+    address _strategy
+  ) internal {
+    RangePoolData storage rpd = rangePoolInfo[_rangePool];
+    rpd.owner = _owner;
+    rpd.lp = address(new LiquidityProviderToken(RangePool(_rangePool).tokenId()));
+    if (_strategy != address(0)) rpd.isRegisteredStrategy[_strategy] = true;
   }
 
   function _mint(
@@ -255,18 +256,21 @@ contract RangePoolManagerBase is Ownable {
     rangePoolLP(_rangePool).burn(_from, _amount);
   }
 
-  function _checkIfCallerAllowed(
+  function _authenticatePrivatePoolAccess(
     address _rangePool,
     address _sender,
     address _delegate
-  ) private view {
-    address caller = isRegistered(address(_rangePool), _sender) ? _delegate : _sender;
+  ) internal view {
+    address caller = isRegistered(_rangePool, _sender) ? _delegate : _sender;
+    if (isPrivate(_rangePool)) {
+      require(rangePoolOwner(_rangePool) == caller, 'RangePoolManagerBase: Caller not allowed in private pool');
+    }
+  }
 
-    bool allowed = (isPrivate(_rangePool))
-      ? (rangePoolOwner(_rangePool) == caller)
-      : (isRegistered(address(_rangePool), _sender));
-
-    require(allowed, 'RangePoolManagerBase: Caller not allowed');
+  function _authenticateCollectivePoolAccess(address _rangePool, address _sender) internal view {
+    if (!isPrivate(_rangePool)) {
+      require(isRegistered(_rangePool, _sender), 'RangePoolManagerBase: Caller not allowed in collective pool');
+    }
   }
 
   function _safeTransferTokens(

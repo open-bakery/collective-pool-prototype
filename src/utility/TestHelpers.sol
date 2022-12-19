@@ -9,7 +9,6 @@ import '../libraries/Helper.sol';
 abstract contract TestHelpers is DeployHelpers, Logs {
   function deployBase() public {
     rangePoolFactory = new RangePoolFactory(address(uniswapFactory), address(uniswapRouter), address(positionManager));
-    simpleStrategies = new SimpleStrategies();
   }
 
   function simpleAmount(uint256 amount, address token) internal view returns (uint256) {
@@ -78,20 +77,4 @@ abstract contract TestHelpers is DeployHelpers, Logs {
     );
     return predictedAddress;
   }
-
-  // function onERC721Received(
-  //   address operator,
-  //   address from,
-  //   uint256 id,
-  //   bytes calldata data
-  // ) external view override returns (bytes4) {
-  //   operator;
-  //   from;
-  //   id;
-  //   data;
-  //
-  //   logr('onERC721Received()', ['0', '0', '0', '0', '0', '0'], [uint256(0), 0, 0, 0, 0, 0]);
-  //
-  //   return this.onERC721Received.selector;
-  // }
 }
