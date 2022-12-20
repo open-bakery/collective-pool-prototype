@@ -34,17 +34,9 @@ abstract contract ARangePoolManagerTest is ARangePoolTest {
     );
   }
 
-  function _createCollectiveRangePool() internal returns (RangePool _rangePool) {
+  function _createCollectiveRangePool(address strategy) internal returns (RangePool _rangePool) {
     _rangePool = RangePool(
-      rangePoolManager.createCollectiveRangePool(
-        tokenA,
-        tokenB,
-        fee,
-        oracleSeconds,
-        lowerLimitB,
-        upperLimitB,
-        address(0xfff)
-      )
+      rangePoolManager.createCollectiveRangePool(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB, strategy)
     );
   }
 

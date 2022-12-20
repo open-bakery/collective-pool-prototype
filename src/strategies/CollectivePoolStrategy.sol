@@ -8,7 +8,7 @@ import '@openzeppelin/contracts/math/SafeMath.sol';
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
-import './RangePoolManager.sol';
+import '../RangePoolManager.sol';
 
 contract CollectivePoolStrategy {
   using SafeERC20 for ERC20;

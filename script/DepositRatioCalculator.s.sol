@@ -5,12 +5,14 @@ pragma abicoder v2;
 import '../src/utility/TestHelpers.sol';
 import '../src/DepositRatioCalculator.sol';
 
-contract DepositRatioCalculatorTest is TestHelpers {
+contract DepositRatioCalculatorScript is TestHelpers {
   address wallet = vm.envAddress('WALLET');
 
   DepositRatioCalculator drc = new DepositRatioCalculator();
 
-  function testDepositRatioCalculator() public view {
+  function run() external view {}
+
+  function testDepositRatioCalculator() internal view {
     address token0 = ARB_WETH;
     address token1 = ARB_GMX;
     uint24 fee = 3000;

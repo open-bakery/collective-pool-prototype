@@ -5,9 +5,9 @@ pragma abicoder v2;
 import '../src/interfaces/IRangePool.sol';
 
 import '../src/utility/TestHelpers.sol';
-import './Logs.t.sol';
+import './Logs.s.sol';
 
-contract ForkRangePoolTest is TestHelpers, LogsTest {
+contract ForkRangePoolScript is TestHelpers {
   using PositionValue for INonfungiblePositionManager;
   using SafeMath for uint256;
   using SafeMath for uint128;
@@ -51,14 +51,14 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
   function testFullLogs() public {
     initialize(tokenA, tokenB, fee, oracleSeconds, lowerLimitB, upperLimitB);
     addLiquidity(20_000_000000, 5 ether, 1_00);
-    logPrincipal(rangePool);
+    logPrincipal(rangePool, lens);
     performSwaps(tokenA, 100_000_000000, tokenB, fee, 10);
-    logUnclaimedFees(rangePool);
-    logAveragePrices(rangePool);
-    logTokenAmountsAtLimits(rangePool);
-    logPrices(rangePool);
-    logOraclePrices(rangePool, 60);
-    logLimits(rangePool);
+    logUnclaimedFees(rangePool, lens);
+    logAveragePrices(rangePool, lens);
+    logTokenAmountsAtLimits(rangePool, lens);
+    logPrices(rangePool, lens);
+    logOraclePrices(rangePool, lens, 60);
+    logLimits(rangePool, lens);
   }
 
   function testMainnet() public {
@@ -75,7 +75,7 @@ contract ForkRangePoolTest is TestHelpers, LogsTest {
 
   function testPoolConstruct() internal {
     initialize(MAIN_WETH, MAIN_USDC, 500, 60, 1000_000000, 2000_000000);
-    logLimits(rangePool);
+    logLimits(rangePool, lens);
   }
 
   function initialize(

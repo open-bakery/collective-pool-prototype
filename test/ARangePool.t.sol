@@ -20,9 +20,9 @@ abstract contract ARangePoolTest is TestHelpers, IERC721Receiver {
     deployAndDistributeTokens();
     deployUniswapBase(tokens.weth);
     initPoolProps();
-    deployedPool = createUniswapPool(poolProps[1], 10_000, 10_500_000, 1500);
-    tokenA = poolProps[1].tokenA; // weth
-    tokenB = poolProps[1].tokenB; // dai
+    deployedPool = createUniswapPool(poolProps[1], 100_000, 100_500_000, 1500);
+    tokenA = poolProps[1].tokenA; // weth - token1
+    tokenB = poolProps[1].tokenB; // dai - token0
     fee = poolProps[1].fee;
     oracleSeconds = 60;
     lowerLimitB = simpleAmount(1_000, tokenB);

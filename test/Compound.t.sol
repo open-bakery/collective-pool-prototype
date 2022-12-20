@@ -16,7 +16,7 @@ contract CompoundTest is AStrategyTest {
   }
 
   function testCompound() public {
-    RangePool rp = _createRangePoolAndAttachStrategy(address(compound));
+    RangePool rp = _createRangePoolAndAttachStrategy(true, address(compound));
     _addLiquidity(rp);
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
 
@@ -49,7 +49,7 @@ contract CompoundTest is AStrategyTest {
   }
 
   function testAStrategyPrivatePoolRevert() public {
-    RangePool rp = _createRangePoolAndAttachStrategy(address(compound));
+    RangePool rp = _createRangePoolAndAttachStrategy(true, address(compound));
     _addLiquidity(rp);
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
 

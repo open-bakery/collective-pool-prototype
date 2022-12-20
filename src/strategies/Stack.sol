@@ -19,22 +19,32 @@ contract Stack is AStrategy {
     address tokenToStack,
     uint16 slippage
   ) external onlyAllowed(rangePool) returns (uint256 amountStacked) {
+    amountStacked = _stack(rangePool, tokenToStack, slippage);
+    _safeTransferToken(msg.sender, tokenToStack, amountStacked);
+    emit Stacked(msg.sender, amountStacked);
+  }
+
+  function _stack(
+    RangePool _rangePool,
+    address _tokenToStack,
+    uint16 _slippage
+  ) internal returns (uint256 _amountStacked) {
     Swapper.SwapParameters memory swapParams;
 
     {
       swapParams.recipient = address(this);
-      swapParams.tokenOut = tokenToStack;
-      swapParams.slippage = slippage;
-      swapParams.fee = rangePool.pool().fee();
-      swapParams.oracleSeconds = rangePool.oracleSeconds();
+      swapParams.tokenOut = _tokenToStack;
+      swapParams.slippage = _slippage;
+      swapParams.fee = _rangePool.pool().fee();
+      swapParams.oracleSeconds = _rangePool.oracleSeconds();
     }
 
     require(
-      swapParams.tokenOut == rangePool.pool().token0() || swapParams.tokenOut == rangePool.pool().token1(),
+      swapParams.tokenOut == _rangePool.pool().token0() || swapParams.tokenOut == _rangePool.pool().token1(),
       'SimpleStrategies:Can only stack tokens belonging to the pool'
     );
 
-    CollectReturns memory cr = _collect(rangePool);
+    CollectReturns memory cr = _collect(_rangePool);
 
     swapParams.tokenIn = (swapParams.tokenOut == cr.token0) ? cr.token1 : cr.token0;
 
@@ -54,14 +64,10 @@ contract Stack is AStrategy {
         slippage: swapParams.slippage,
         oracleSeconds: swapParams.oracleSeconds
       }),
-      rangePool.uniswapFactory(),
-      rangePool.uniswapRouter()
+      _rangePool.uniswapFactory(),
+      _rangePool.uniswapRouter()
     );
 
-    amountStacked = amountAcquired.add(amountCollected);
-
-    _safeTransferToken(msg.sender, swapParams.tokenOut, amountStacked);
-
-    emit Stacked(msg.sender, amountStacked);
+    _amountStacked = amountAcquired.add(amountCollected);
   }
 }

@@ -56,8 +56,8 @@ contract RangePool is IRangePool, Ownable {
       params.upperLimitInTokenB
     );
 
-    ERC20(pool.token0()).safeApprove(address(params.positionManager), type(uint256).max);
-    ERC20(pool.token1()).safeApprove(address(params.positionManager), type(uint256).max);
+    ERC20(pool.token0()).approve(address(params.positionManager), type(uint256).max);
+    ERC20(pool.token1()).approve(address(params.positionManager), type(uint256).max);
   }
 
   function addLiquidity(
@@ -95,7 +95,9 @@ contract RangePool is IRangePool, Ownable {
   }
 
   function claimNFT(address recipient) external onlyOwner {
+    require(tokenId != 0, 'RangePool: No position available');
     positionManager.safeTransferFrom(address(this), recipient, tokenId);
+    tokenId = 0;
   }
 
   function collectFees()
@@ -135,6 +137,10 @@ contract RangePool is IRangePool, Ownable {
       uint256 amountRefunded1
     )
   {
+    bool control = (tokenId != 0) ? Helper.positionLiquidity(positionManager, tokenId) != 0 : false;
+
+    require(control, 'UpdateRange: Position must have liquidity');
+
     (uint256 collected0, uint256 collected1) = _decreaseLiquidity(
       address(this),
       Helper.positionLiquidity(positionManager, tokenId),

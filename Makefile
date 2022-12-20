@@ -5,25 +5,3 @@
 deploy-testnet:; forge script script/DevDeploy.s.sol:Deploy --fork-url $(FORK_RPC_URL) --private-key $(TEST_PRIVATE_KEY) --broadcast --slow
 
 trace:; forge test -vv
-
-testHelpers:; forge test -vv --mc ^TestHelpersTest$
-
-testRangePool:; forge test -vvv --mc ^RangePoolTest$
-
-testRangePoolManager:; forge test -vv --mc ^RangePoolManagerTest$
-
-testSimpleStrategy:; forge test -vv --mc ^SimpleStrategiesTest$
-
-testLocal:; forge test -vvv --match-test testAnvil*
-
-#testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(FORK_RPC_URL)
-testRatio:; forge test -vvv --mt testDepositRatioCalculator* --fork-url $(ARBITRUM_RPC_ALCHEMY)
-
-# testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL)
-testMain:; forge test -vvv --mt testMainnet* --fork-url $(FORK_RPC_URL) --gas-report
-
-testArb:; forge test -vvv --mt testArbitrum*  --fork-url $(ARBITRUM_RPC_ALCHEMY)
-
-testLogs:; forge test -vvv --mt testFullLogs* --fork-url $(FORK_RPC_URL)
-
-testGas:; forge test -vv --mc GasTest --gas-report --fork-url $(ARBITRUM_RPC_ALCHEMY)

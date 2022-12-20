@@ -116,13 +116,16 @@ contract RangePoolManagerTest is ARangePoolManagerTest {
 
   function testPrivatePoolClaimNFT() public {
     RangePool privateRangePool = _createPrivateRangePool();
+
     _addLiquidity(privateRangePool);
+
+    uint256 tokenId = privateRangePool.tokenId();
+
     rangePoolManager.claimNFT(privateRangePool, address(this));
 
     assertTrue(
-      INonfungiblePositionManager(RangePoolFactory(rangePoolFactory).positionManager()).ownerOf(
-        privateRangePool.tokenId()
-      ) == address(this),
+      INonfungiblePositionManager(RangePoolFactory(rangePoolFactory).positionManager()).ownerOf(tokenId) ==
+        address(this),
       'Change NFT ownership'
     );
   }
@@ -322,20 +325,20 @@ contract RangePoolManagerTest is ARangePoolManagerTest {
   }
 
   function testDeployCollectiveRangePool() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
+    RangePool collectiveRangePool = _createCollectiveRangePool(address(0xfff));
     assertTrue(rangePoolManager.rangePoolOwner(address(collectiveRangePool)) == address(0), 'No owner check');
     assertTrue(address(rangePoolManager.rangePoolLP(address(collectiveRangePool))) != address(0), 'LP minted check');
   }
 
   function testCollectiveRangePoolAddLiquidity() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
+    RangePool collectiveRangePool = _createCollectiveRangePool(address(0xfff));
     (uint128 liquidityAdded, , , , ) = _addLiquidity(collectiveRangePool);
     LiquidityProviderToken lp = rangePoolManager.rangePoolLP(address(collectiveRangePool));
     assertTrue(lp.balanceOf(address(this)) == liquidityAdded, 'Liquidity Added Check');
   }
 
   function testCollectivePoolRemoveLiquidity() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
+    RangePool collectiveRangePool = _createCollectiveRangePool(address(0xfff));
     _addLiquidity(collectiveRangePool);
     (uint256 initialBalance0, uint256 initialBalance1) = _tokenBalances(
       collectiveRangePool.pool().token0(),
@@ -360,14 +363,14 @@ contract RangePoolManagerTest is ARangePoolManagerTest {
   }
 
   function testCollectivePoolRemoveLiquidityRevert() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
+    RangePool collectiveRangePool = _createCollectiveRangePool(address(0xfff));
     (uint128 _liquidityAdded, , , , ) = _addLiquidity(collectiveRangePool);
     vm.expectRevert(bytes('RangePoolManagerBase: Not enough liquidity balance'));
     rangePoolManager.removeLiquidity(collectiveRangePool, uint128(_liquidityAdded * 2), 1_00);
   }
 
   function testCollectivePoolCollectFeesRevert() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
+    RangePool collectiveRangePool = _createCollectiveRangePool(address(0xfff));
     _addLiquidity(collectiveRangePool);
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
     vm.expectRevert(bytes('RangePoolManagerBase: Caller not allowed in collective pool'));
@@ -375,7 +378,7 @@ contract RangePoolManagerTest is ARangePoolManagerTest {
   }
 
   function testCollectivePoolUpdateRangeRevert() public {
-    RangePool collectiveRangePool = _createCollectiveRangePool();
+    RangePool collectiveRangePool = _createCollectiveRangePool(address(0xfff));
     _addLiquidity(collectiveRangePool);
     address token1 = collectiveRangePool.pool().token1();
     uint256 newLowerRange = Conversion.convertTickToPriceUint(

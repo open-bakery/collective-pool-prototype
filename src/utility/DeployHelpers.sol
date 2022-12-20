@@ -37,7 +37,7 @@ abstract contract DeployHelpers is DevConstants, LocalVars {
   }
 
   function deployAndDistributeToken(string memory symbol, uint8 decimals) internal returns (address) {
-    Token t = new Token(symbol, symbol, decimals, a(100_000_000, decimals));
+    Token t = new Token(symbol, symbol, decimals, a(1_000_000_000, decimals));
     distributeToken(t);
     return address(t);
   }

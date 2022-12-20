@@ -14,7 +14,7 @@ contract StackTest is AStrategyTest {
   }
 
   function testStack() public {
-    RangePool rp = _createRangePoolAndAttachStrategy(address(stack));
+    RangePool rp = _createRangePoolAndAttachStrategy(true, address(stack));
     _addLiquidity(rp);
     performSwaps(tokenA, simpleAmount(100, tokenA), tokenB, fee, 10);
 
